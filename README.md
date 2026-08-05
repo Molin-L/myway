@@ -42,10 +42,26 @@ issue #42                    full plan verbatim — the spec of record
 
 ## Install
 
+**Claude Code**
+
 ```
 /plugin marketplace add Molin-L/myway
 /plugin install myway
 ```
+
+**OpenAI Codex** — the skills follow the same [Agent Skills](https://agentskills.io)
+standard, and Codex follows symlinked skill folders. Clone this repo, then link
+each skill into your user scope:
+
+```sh
+git clone https://github.com/Molin-L/myway
+for s in myway/plugins/myway/skills/*/; do
+  ln -s "$(cd "$s" && pwd)" ~/.agents/skills/"$(basename "$s")"
+done
+```
+
+(Working *inside* this repo needs no install — Codex picks the skills up from
+the committed `.agents/skills/` symlinks.)
 
 ## Configuration
 
