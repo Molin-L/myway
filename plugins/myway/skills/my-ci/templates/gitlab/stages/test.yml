@@ -1,0 +1,42 @@
+# ============================================================
+# Test stage — the pre-merge gate
+# ============================================================
+# Everything here is a CHECK: it runs on MRs, dev-release tags, and the
+# integration branches — NEVER on the release/* ship path (checks already
+# passed on the feeding MR; the ship path only ships).
+#
+# Add project-specific quality gates as extra jobs extending .gate_rules —
+# see the commented example at the bottom.
+# ============================================================
+
+test:
+  stage: test
+  extends: .myci_setup
+  needs:
+    - job: build:check
+      artifacts: true
+  script:
+    - |
+      ci/scripts/test.sh || (
+        echo "Test stage failed" | \
+        ci/scripts/notify.sh error "Tests Failed - ${CI_PROJECT_NAME} ${CI_COMMIT_TAG:-$CI_COMMIT_REF_NAME}"
+        exit 1
+      )
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - junit.xml
+    expire_in: 1 hour
+  rules:
+    - !reference [.gate_rules, rules]
+
+# --- Example quality gate (static, fast, no build artifact needed) ---
+# gate:lint:
+#   stage: test
+#   extends: .myci_setup
+#   script:
+#     - ci/scripts/lint.sh          # or: npx eslint . / cargo clippy / ruff check
+#   rules:
+#     - !reference [.gate_rules, rules]

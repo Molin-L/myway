@@ -1,0 +1,72 @@
+# ============================================================
+# my-ci — GitHub Actions: pre-merge gate
+# ============================================================
+# Scaffolded by the myway `my-ci` skill. Place at .github/workflows/ci.yml;
+# the scripts go to `ci/scripts/`.
+#
+# The pre-merge gate: every PR runs the full check set (feature →
+# pre-release/X.Y.Z, the promote PR pre-release → release/X.Y.Z, and the
+# back-merge release → default), and the integration branches re-run it on
+# push. Nothing here publishes — shipping lives in release.yml.
+#
+# Build-once: `build` uploads build/ as an artifact; `test` consumes it and
+# does not rebuild.
+# ============================================================
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # CUSTOMIZE: runner label, or add `container:` for a toolchain image.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build
+        run: |
+          chmod +x ci/scripts/*.sh
+          ci/scripts/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: build/
+          retention-days: 1
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: build/
+      - name: Test
+        run: |
+          chmod +x ci/scripts/*.sh
+          ci/scripts/test.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit
+          path: junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # --- Example quality gate (static, fast, runs in parallel with build) ---
+  # gate-lint:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - run: npx eslint .   # or: cargo clippy / ruff check / your gate script

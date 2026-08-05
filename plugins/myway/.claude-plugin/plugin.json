@@ -17,6 +17,7 @@
     "release"
   ],
   "skills": [
-    "./skills/implement-change"
+    "./skills/implement-change",
+    "./skills/my-ci"
   ]
 }

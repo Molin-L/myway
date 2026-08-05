@@ -1,0 +1,165 @@
+# ============================================================
+# Release stages — tag, package, ship, back-merge
+# ============================================================
+# Two ship paths:
+#   production_release   release/X.Y.Z promote-merge push (NO checks here —
+#                        they passed on the feeding MR; this path only ships)
+#   development_release  X.Y.Z-<suffix> tag (no MR precedes a pushed tag, so
+#                        the full check set runs INLINE and gates it via needs)
+# ============================================================
+
+# --- Create the production tag (release/X.Y.Z → tag X.Y.Z) ---
+create_tag:
+  stage: create_tag
+  extends: .myci_setup
+  dependencies: []
+  script:
+    - |
+      ci/scripts/create_release_tag.sh || (
+        echo "Create tag stage failed" | \
+        ci/scripts/notify.sh error "Tag Creation Failed - ${CI_PROJECT_NAME} ${CI_COMMIT_REF_NAME}"
+        exit 1
+      )
+  artifacts:
+    paths:
+      - RELEASE_CHANGELOG.md
+      - CHANGELOG.md
+      - dist/VERSION
+    reports:
+      # RELEASE_VERSION / RELEASE_TAG flow to downstream jobs — but ONLY via
+      # `needs` with artifacts: true (dotenv does not flow through stages).
+      dotenv: release.env
+    expire_in: 1 hour
+  rules:
+    - !reference [.release_rules, rules]
+
+# --- Assemble the release/ directory ---
+package:
+  stage: package
+  extends: .myci_setup
+  needs:
+    # optional: create_tag exists only on the production path; on dev tags
+    # package runs without it.
+    - job: create_tag
+      artifacts: true
+      optional: true
+  script:
+    - |
+      ci/scripts/package.sh || (
+        echo "Package stage failed" | \
+        ci/scripts/notify.sh error "Packaging Failed - ${CI_PROJECT_NAME} ${CI_COMMIT_TAG:-$CI_COMMIT_REF_NAME}"
+        exit 1
+      )
+  artifacts:
+    paths:
+      - release/
+    expire_in: 1 hour
+  rules:
+    - !reference [.release_rules, rules]
+    - if: '$CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z-.]+$/'
+      when: on_success
+    - when: never
+
+# --- Production ship: release/X.Y.Z promote-merge push ---
+production_release:
+  stage: release
+  extends: .myci_setup
+  # Ship-only path: gate ONLY on the ship jobs, never on checks (which do not
+  # exist on this pipeline). artifacts: true also carries the create_tag
+  # dotenv (RELEASE_VERSION) — dotenv only flows via needs.
+  needs:
+    - job: create_tag
+      artifacts: true
+    - job: package
+      artifacts: true
+  script:
+    - |
+      ci/scripts/create_release.sh || (
+        echo "Release creation failed" | \
+        ci/scripts/notify.sh error "Release Failed - ${CI_PROJECT_NAME} ${RELEASE_VERSION:-$CI_COMMIT_REF_NAME}"
+        exit 1
+      )
+    - |
+      ci/scripts/publish.sh || (
+        echo "Artifact publish failed" | \
+        ci/scripts/notify.sh error "Publish Failed - ${CI_PROJECT_NAME} ${RELEASE_VERSION:-$CI_COMMIT_REF_NAME}"
+        exit 1
+      )
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" = "success" ]; then
+        chmod +x ci/scripts/*.sh
+        FILE=""
+        [ -f RELEASE_CHANGELOG.md ] && FILE="RELEASE_CHANGELOG.md"
+        [ -z "$FILE" ] && [ -f CHANGELOG.md ] && FILE="CHANGELOG.md"
+        if [ -n "$FILE" ]; then
+          cat "$FILE" | ci/scripts/notify.sh success "Production Release - ${CI_PROJECT_NAME} ${RELEASE_VERSION:-$CI_COMMIT_REF_NAME}"
+        else
+          echo "Release published" | ci/scripts/notify.sh success "Production Release - ${CI_PROJECT_NAME} ${RELEASE_VERSION:-$CI_COMMIT_REF_NAME}"
+        fi
+      fi
+  # No `environment:` on purpose: the promote merge into release/X.Y.Z is the
+  # deploy gate (merge permission on release/*). A protected environment here
+  # would be a redundant second approval after the merge already authorized it.
+  rules:
+    - !reference [.release_rules, rules]
+
+# --- Development ship: X.Y.Z-<suffix> tag ---
+development_release:
+  stage: release
+  extends: .myci_setup
+  # The full check set gates the dev ship via needs — every check job that
+  # runs on a dev tag MUST be listed here, or the release can ship before a
+  # missing check finishes. Add any extra gate:* jobs you define.
+  needs:
+    - job: build:check
+      artifacts: false
+    - job: test
+      artifacts: false
+    - job: package
+      artifacts: true
+  script:
+    - ci/scripts/gen_changelog.sh
+    - |
+      ci/scripts/create_release.sh || (
+        echo "Release creation failed" | \
+        ci/scripts/notify.sh error "Release Failed - ${CI_PROJECT_NAME} ${CI_COMMIT_TAG}"
+        exit 1
+      )
+    - |
+      ci/scripts/publish.sh || (
+        echo "Artifact publish failed" | \
+        ci/scripts/notify.sh error "Publish Failed - ${CI_PROJECT_NAME} ${CI_COMMIT_TAG}"
+        exit 1
+      )
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" = "success" ]; then
+        chmod +x ci/scripts/*.sh
+        echo "Development release published" | \
+        ci/scripts/notify.sh success "Development Release - ${CI_PROJECT_NAME} ${CI_COMMIT_TAG}"
+      fi
+  environment:
+    name: development
+    deployment_tier: development
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z-.]+$/'
+      when: on_success
+    - when: never
+
+# --- Back-merge release/X.Y.Z → default branch ---
+# Best-effort twice over: backmerge.sh handles every non-happy path by
+# warning and exiting 0, and allow_failure guards the rest — a green release
+# pipeline never goes red because of the back-merge.
+backmerge:
+  stage: release
+  extends: .myci_setup
+  needs:
+    - job: production_release
+      artifacts: false
+  dependencies: []
+  allow_failure: true
+  script:
+    - ci/scripts/backmerge.sh
+  rules:
+    - !reference [.release_rules, rules]

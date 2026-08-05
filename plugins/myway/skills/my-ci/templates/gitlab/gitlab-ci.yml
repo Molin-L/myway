@@ -1,0 +1,102 @@
+# ============================================================
+# my-ci — GitLab CI/CD pipeline
+# ============================================================
+# Scaffolded by the myway `my-ci` skill. Rename to `.gitlab-ci.yml` at the
+# repo root; the stage files go to `.gitlab/stages/`, the scripts to
+# `ci/scripts/`.
+#
+# Branching model (release-flow with pre-release trains — matches the myway
+# `implement-change` skill and ADR 0001 "the pre-release branch name is the
+# version source of truth"):
+#   feature/*         ──MR──▶ pre-release/X.Y.Z   checks run on the MR (pre-merge gate)
+#   pre-release/X.Y.Z ──MR──▶ release/X.Y.Z       promote MR runs the same check set
+#   release/X.Y.Z  (branch creation)              NO pipeline (an empty cut must not ship)
+#   release/X.Y.Z  (promote-merge push)           SHIP: tag X.Y.Z → package → release → back-merge
+#   X.Y.Z tag      (CI-created, plain semver)     BLOCKED (already built on the ship push)
+#   X.Y.Z-<suffix> tag (dev release)              checks inline, then ship as pre-release
+#   dev / develop                                 checks only, never publish
+#
+# Principles (see the skill's references/pipeline-model.md):
+#   * build once — artifacts flow between jobs via artifacts/needs, never rebuilt
+#   * checks run pre-merge only; the release path only ships
+#   * production tags are CI-managed plain semver (no leading 'v'), never hand-pushed
+#
+# Required CI/CD variables (Settings → CI/CD → Variables):
+#   MYCI_PUSH_TOKEN       project access token, scopes `api` + `write_repository`,
+#                         role with push rights on protected release/* and tags,
+#                         and merge rights on the default branch (back-merge)
+#   MYCI_NOTIFY_WEBHOOK   optional — webhook for failure/success notifications
+#   MYCI_NOTIFY_STYLE     optional — generic (default) | feishu | slack
+# ============================================================
+
+workflow:
+  rules:
+    # CI-created production tag X.Y.Z — block: it already built on the
+    # release/* ship push that created it. `v?` keeps legacy vX.Y.Z blocked too.
+    - if: '$CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: never
+    # Dev-release tag X.Y.Z-<suffix> — full checks inline, then dev publish.
+    - if: '$CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z-.]+$/'
+    # release/X.Y.Z SHIPS only on a *merge into* the branch (the promote-MR
+    # merge). Keyed on the merge-commit TITLE, not CI_COMMIT_BEFORE_SHA —
+    # before_sha is all-zeros on a branch's first push and on MR pipelines,
+    # and is unreliable on some instances. A bare branch creation does not
+    # match, so cutting release/X.Y.Z ships nothing.
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/ && $CI_COMMIT_TITLE =~ / into .release\/[0-9]+\.[0-9]+\.[0-9]+./'
+    # Any other push to release/* (bare creation, direct push) ships nothing.
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: never
+    # Integration branches — full check set, no publish.
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "develop"'
+    # All MRs run the pre-merge check set (feature → pre-release, the promote
+    # MR pre-release → release, and the back-merge release → default).
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - when: never
+
+stages:
+  - build
+  - test
+  - create_tag
+  - package
+  - release
+
+variables:
+  # CUSTOMIZE: the image your toolchain lives in.
+  IMAGE: "alpine:latest"
+  GIT_DEPTH: 50
+
+default:
+  image: $IMAGE
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+
+# Shared job setup: every job runs the vendored ci/scripts/.
+.myci_setup:
+  before_script:
+    - git config --global --add safe.directory "$PWD"
+    - chmod +x ci/scripts/*.sh
+
+# The pre-merge gate set: MRs + dev-release tags + integration branches.
+# Checks extend this; the release path must NOT (it only ships).
+.gate_rules:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG =~ /^v?[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z-.]+$/'
+    - if: '$CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "develop"'
+    - when: never
+
+# The production ship path: release/X.Y.Z only (the workflow rules above
+# already guarantee this pipeline exists only for the promote-merge push).
+.release_rules:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: on_success
+    - when: never
+
+include:
+  - local: '.gitlab/stages/build.yml'
+  - local: '.gitlab/stages/test.yml'
+  - local: '.gitlab/stages/release.yml'

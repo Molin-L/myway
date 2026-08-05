@@ -1,0 +1,119 @@
+# ============================================================
+# my-ci — GitHub Actions: ship paths
+# ============================================================
+# Scaffolded by the myway `my-ci` skill. Place at .github/workflows/release.yml.
+#
+# Production path: ships when the promote PR MERGES into release/X.Y.Z — the
+# `closed` + `merged == true` guard is GitHub's native equivalent of the
+# GitLab merge-commit-title rule. A bare branch creation, a direct push, or a
+# close-without-merge ships nothing. No checks run here: they already passed
+# on the promote PR; this path only ships.
+#
+# Dev path: a pushed X.Y.Z-<suffix> tag runs the full check set INLINE (no PR
+# precedes a pushed tag), then ships a prerelease.
+#
+# No double build, structurally: the production tag X.Y.Z is pushed by
+# create_release_tag.sh using GITHUB_TOKEN, and events triggered with
+# GITHUB_TOKEN do not fire workflows — so the CI-created tag can never
+# trigger a second build.
+#
+# Optional secrets: MYCI_NOTIFY_WEBHOOK (+ MYCI_NOTIFY_STYLE var) for
+# notifications.
+# ============================================================
+
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: ['release/**']
+  push:
+    tags: ['[0-9]*.[0-9]*.[0-9]*-*']
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ---------- dev-release tag: checks run inline ----------
+  check:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build and test
+        run: |
+          chmod +x ci/scripts/*.sh
+          ci/scripts/build.sh
+          ci/scripts/test.sh
+
+  development_release:
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ubuntu-latest
+    environment: development
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MYCI_NOTIFY_WEBHOOK: ${{ secrets.MYCI_NOTIFY_WEBHOOK }}
+      MYCI_NOTIFY_STYLE: ${{ vars.MYCI_NOTIFY_STYLE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Changelog, package, release, publish
+        run: |
+          chmod +x ci/scripts/*.sh
+          ci/scripts/gen_changelog.sh
+          ci/scripts/build.sh          # dev artifacts are built here; the check job's build is a gate, not a hand-off
+          ci/scripts/package.sh
+          ci/scripts/create_release.sh
+          ci/scripts/publish.sh
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "Development release failed: ${{ github.ref_name }}" | \
+          ci/scripts/notify.sh error "Development Release Failed - ${{ github.repository }} ${{ github.ref_name }}"
+
+  # ---------- production: promote PR merged into release/X.Y.Z ----------
+  production_release:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # pull_request events report a synthetic "<n>/merge" ref; hand the real
+      # release branch to the scripts explicitly.
+      MYCI_BRANCH: ${{ github.event.pull_request.base.ref }}
+      MYCI_NOTIFY_WEBHOOK: ${{ secrets.MYCI_NOTIFY_WEBHOOK }}
+      MYCI_NOTIFY_STYLE: ${{ vars.MYCI_NOTIFY_STYLE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the release branch tip (the merge result), not the PR
+          # merge ref; full history so tags and the changelog range resolve.
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+      - name: Tag, package, release, publish
+        run: |
+          chmod +x ci/scripts/*.sh
+          ci/scripts/create_release_tag.sh
+          set -a; . ./release.env; set +a
+          ci/scripts/package.sh
+          ci/scripts/create_release.sh
+          ci/scripts/publish.sh
+      - name: Back-merge into default branch
+        # Best-effort: backmerge.sh exits 0 on every non-happy path, and
+        # continue-on-error guards the rest — the shipped release stays green.
+        continue-on-error: true
+        run: ci/scripts/backmerge.sh
+      - name: Notify
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            cat RELEASE_CHANGELOG.md 2>/dev/null | \
+            ci/scripts/notify.sh success "Production Release - ${{ github.repository }} ${{ github.event.pull_request.base.ref }}"
+          else
+            echo "Production release failed: ${{ github.event.pull_request.base.ref }}" | \
+            ci/scripts/notify.sh error "Release Failed - ${{ github.repository }} ${{ github.event.pull_request.base.ref }}"
+          fi

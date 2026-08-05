@@ -1,0 +1,25 @@
+# ============================================================
+# Build stage — the single build of the pipeline (build-once)
+# ============================================================
+# build:check produces build/, consumed by `test` (and anything else) via
+# artifacts. It runs on the pre-merge gate set only; the release/* ship path
+# does not rebuild — its shippable artifact is assembled by `package` from
+# what the feeding MR already verified.
+# ============================================================
+
+build:check:
+  stage: build
+  extends: .myci_setup
+  script:
+    - |
+      ci/scripts/build.sh || (
+        echo "Build stage failed" | \
+        ci/scripts/notify.sh error "Build Failed - ${CI_PROJECT_NAME} ${CI_COMMIT_TAG:-$CI_COMMIT_REF_NAME}"
+        exit 1
+      )
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+  rules:
+    - !reference [.gate_rules, rules]
