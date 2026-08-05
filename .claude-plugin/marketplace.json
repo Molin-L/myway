@@ -1,0 +1,23 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "myway",
+  "description": "Development workflows, my way — opinionated end-to-end change management for Claude Code",
+  "owner": {
+    "name": "Molin. L",
+    "url": "https://github.com/Molin-L"
+  },
+  "plugins": [
+    {
+      "name": "myway",
+      "description": "Governs the scaffolding around a change: issue as spec of record, feature branch off the latest pre-release train, conventional commits, change request, and a bounded, infra-aware CI escort to green. Works across GitHub and self-hosted GitLab.",
+      "author": {
+        "name": "Molin. L"
+      },
+      "source": "./plugins/myway",
+      "version": "0.1.0",
+      "category": "workflow",
+      "tags": ["git", "github", "gitlab", "conventional-commits", "ci", "release"],
+      "homepage": "https://github.com/Molin-L/myway"
+    }
+  ]
+}
