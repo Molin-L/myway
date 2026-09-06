@@ -1,6 +1,6 @@
 {
   "name": "myway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Development workflows, my way. Governs the scaffolding around a change: issue as spec of record, feature branch off the latest pre-release train, conventional commits, change request, and a bounded CI escort to green.",
   "author": {
     "name": "Molin. L"

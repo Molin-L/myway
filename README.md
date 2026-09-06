@@ -7,6 +7,11 @@ One instruction (*"implement this plan"*, *"fix this bug"*, *"bump easytier to
 conventional commits, a verified change request, and a green pipeline. No
 approval prompts in between.
 
+It also picks up work you already wrote: *"create an MR"*, *"open a PR"*,
+*"push this and raise a merge request"* join the same arc late — commits,
+local verification, change request, pipeline escort — instead of a bare
+`glab mr create` that nobody watches.
+
 ## The arc
 
 ```
@@ -39,6 +44,16 @@ issue #42                    full plan verbatim — the spec of record
 - **Never strands work.** Blocked runs still push and still open a draft change
   request explaining why. If you walked away, the outcome has to be where you
   will look.
+
+## Making it fire
+
+Skill selection is by description match, so the description names the phrases
+people actually type — "create an MR", "open a PR", "watch the pipeline" — not
+only "implement this". Where the workflow is law, one line in the target
+repo's `CLAUDE.md` / `AGENTS.md` removes the remaining guesswork:
+
+> Creating a merge or pull request, or watching a pipeline, always goes
+> through the `myway:implement-change` skill.
 
 ## Install
 
