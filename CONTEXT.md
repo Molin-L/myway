@@ -27,6 +27,13 @@ _Avoid_: ticket description, requirements
 The agreed sequence of implementation steps, authored before the Change begins
 and copied verbatim into the Spec of record.
 
+**Late entry**:
+Invoking the workflow on a Change that is already written — dirty tree, local
+commits, or a pushed branch — via "create an MR" / "open a PR". Joins the arc
+at the first incomplete step; still verifies, still escorts, still stops before
+merge.
+_Avoid_: "just open the MR"
+
 ### Branches
 
 **Pre-release train**:

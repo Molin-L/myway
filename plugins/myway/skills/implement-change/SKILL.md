@@ -1,6 +1,6 @@
 ---
 name: implement-change
-description: End-to-end change workflow — issue → branch off the latest pre-release train → conventional commits → change request → bounded CI escort. Use when the user gives an explicit instruction to change code now ("implement this plan", "fix this bug", "bump easytier to 2.4.5", "add rate limiting"). Do NOT use for questions, explanation, code review, exploration, or hypothetical and future-tense work ("how does X work?", "we should probably add Y someday").
+description: End-to-end change workflow — issue → branch off the latest pre-release train → conventional commits → change request → bounded CI escort. Use when the user gives an explicit instruction to change code now ("implement this plan", "fix this bug", "bump easytier to 2.4.5", "add rate limiting"), AND whenever the user asks to ship or submit work that is already written ("create an MR", "open a PR", "raise a merge request", "push this and open a pull request", "submit this for review", "watch the pipeline", "escort CI"). Every change request and every pipeline escort goes through this skill — never a bare `gh pr create` / `glab mr create`, and never an MR left unwatched. Do NOT use for questions, explanation, code review, exploration, or hypothetical and future-tense work ("how does X work?", "we should probably add Y someday").
 ---
 
 # Implement a Change
@@ -19,8 +19,55 @@ The workflow runs **without approval gates** — one instruction produces an iss
 | "fix the nil deref in OrderRouter" | "we should add rate limiting someday" |
 | "bump easytier to 2.4.5" | "review this diff" |
 | "add a retry policy to the venue client" | "what would it take to add X?" |
+| "create an MR for this" / "open a PR" | "summarise the open MRs" |
+| "push this and raise a merge request" | "is the pipeline usually this slow?" |
+| "watch the pipeline on !57" | "explain the escort rules" |
 
 Also do not fire when: not inside a git repo, `origin` is missing, or the working tree belongs to a repo whose forge you cannot authenticate against. Say so plainly and stop.
+
+## Entry points
+
+One workflow, two doors. The door the user came through changes where you
+**start**, never where you **stop** — every run ends at step 8, after the
+pipeline escort. A change request that is open but unescorted is the midpoint
+of this workflow, not its result.
+
+### Fresh change
+
+"Implement this plan", "fix this bug", "bump X to Y". Nothing exists yet. Run
+steps 1–8.
+
+### Ship what is already written
+
+"Create an MR", "open a PR", "push this and raise a merge request", "submit
+this for review". The code exists — in the working tree, in local commits, or
+on a branch already pushed — and the user wants it proposed and proven. This
+is the **same arc joined late**, not a shortcut around it. Recover what exists,
+then rejoin at the first incomplete step:
+
+| Already there | Do |
+|---|---|
+| Issue (branch named `<type>/<id>-<brief>`, or an id the user gave) | Use it; read it for the acceptance criteria. |
+| No issue | Step 1 now: draft it from the diff and the commit log — the plan is what was done, written as steps. Rename the branch to the convention if it has not been pushed; if it has, keep the name and cite the issue in the change request instead. |
+| Branch exists | Stay on it — no new worktree, no rebase onto another base. Target the train it was cut from; if that cannot be determined, the latest train. |
+| Uncommitted changes | Step 4: commit them as conventional commits, one logical unit each. Never push a dirty tree as one blob. |
+| Not yet verified | Step 5, always — asking for a change request does not waive local verification. |
+| Change request already open | Skip step 6. Step 7 still runs. |
+
+Then steps 6, 7, 8 as written. Even when the user said only "open the MR",
+escort the pipeline it triggers: opening the request is what *starts* a
+pipeline in this fleet, and a pipeline nobody watched is a change request
+nobody proved.
+
+### Resuming mid-flight
+
+When invoked in a worktree already on a `<type>/<id>-<brief>` branch, do not
+start over. Recover state and continue:
+
+1. Issue id from the branch name → read the issue for the spec.
+2. `git log origin/pre-release/<v>..HEAD` → what is already committed.
+3. Query the forge → does a change request already exist? What is the pipeline status?
+4. Rejoin the arc at the first incomplete step.
 
 ## The arc
 
@@ -111,6 +158,9 @@ Commands per forge: [references/forge.md](references/forge.md).
 
 ### 7. Escort the pipeline
 
+This step runs on **every** path through this skill, including when the user
+asked only for the change request. Opening it is not the end of the job.
+
 Only if CI actually applies — that means **the forge of `origin` has CI config for that same forge**, confirmed by a run appearing after the push. A `.gitlab-ci.yml` in a repo whose `origin` is GitHub will never fire; waiting on it hangs forever.
 
 Poll to conclusion. On red, **classify before reacting**:
@@ -142,15 +192,6 @@ Needs a decision before this can proceed.
 The user walked away. The outcome must be discoverable where they will look — the forge. Work stranded in a local worktree is invisible from GitHub or GitLab and does not count as a result.
 
 Never report a change request as ready when it is blocked, and never describe unverified work as verified.
-
-## Resuming mid-flight
-
-When invoked in a worktree already on a `<type>/<id>-<brief>` branch, do not start over. Recover state and continue:
-
-1. Issue id from the branch name → read the issue for the spec.
-2. `git log origin/pre-release/<v>..HEAD` → what is already committed.
-3. Query the forge → does a change request already exist? What is the pipeline status?
-4. Rejoin the arc at the first incomplete step.
 
 ## References
 
