@@ -123,6 +123,23 @@ export MYCI_FORGE MYCI_BRANCH MYCI_TAG MYCI_PROJECT MYCI_PROJECT_URL \
 # release/X.Y.Z -> X.Y.Z
 myci_release_version() { printf '%s' "${1#release/}"; }
 
+# Usage: myci_tag_exists VERSION
+# True when the production tag for VERSION is present locally or on origin.
+# Accepts the bare semver this pipeline creates and a `v` prefix, so a repo
+# that tags `v1.2.3` by hand is still recognized. A remote lookup failure is
+# not a missing tag — the caller must not act on a flaked network — so a
+# failed `ls-remote` re-reports whatever the local check found.
+myci_tag_exists() {
+  local v="$1" t
+  for t in "$v" "v$v"; do
+    git rev-parse -q --verify "refs/tags/${t}" >/dev/null 2>&1 && return 0
+  done
+  for t in "$v" "v$v"; do
+    [ -n "$(git ls-remote --tags origin "refs/tags/${t}" 2>/dev/null)" ] && return 0
+  done
+  return 1
+}
+
 _myci_git_identity() {
   git config user.email >/dev/null 2>&1 || git config user.email "${MYCI_GIT_EMAIL:-ci@my-ci.invalid}"
   git config user.name  >/dev/null 2>&1 || git config user.name  "${MYCI_GIT_NAME:-my-ci}"
