@@ -102,11 +102,6 @@ jobs:
           ci/scripts/package.sh
           ci/scripts/create_release.sh
           ci/scripts/publish.sh
-      - name: Back-merge into default branch
-        # Best-effort: backmerge.sh exits 0 on every non-happy path, and
-        # continue-on-error guards the rest — the shipped release stays green.
-        continue-on-error: true
-        run: ci/scripts/backmerge.sh
       - name: Notify
         if: always()
         run: |
@@ -117,3 +112,35 @@ jobs:
             echo "Production release failed: ${{ github.event.pull_request.base.ref }}" | \
             ci/scripts/notify.sh error "Release Failed - ${{ github.repository }} ${{ github.event.pull_request.base.ref }}"
           fi
+
+  # ---------- back-merge the shipped release into the default branch ----------
+  # Its own job, not a step of production_release. As a step it sat after the
+  # publish steps, so a registry refusing an artifact skipped it and left the
+  # default branch behind an already-published tag; continue-on-error guards
+  # the step it is on, not the ones before it.
+  #
+  # `!cancelled()` rather than plain `needs:` success — the ship failing after
+  # create_release_tag.sh does not un-ship the tag. backmerge.sh makes the real
+  # decision: it skips unless the release tag actually exists.
+  backmerge:
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.merged == true }}
+    needs: [production_release]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    # backmerge.sh waits for the back-merge PR's own checks before merging
+    # (MYCI_BACKMERGE_TIMEOUT, 30 min by default), so leave room past that.
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MYCI_BRANCH: ${{ github.event.pull_request.base.ref }}
+      MYCI_NOTIFY_WEBHOOK: ${{ secrets.MYCI_NOTIFY_WEBHOOK }}
+      MYCI_NOTIFY_STYLE: ${{ vars.MYCI_NOTIFY_STYLE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+      - name: Back-merge into the default branch
+        run: |
+          chmod +x ci/scripts/*.sh
+          ci/scripts/backmerge.sh
