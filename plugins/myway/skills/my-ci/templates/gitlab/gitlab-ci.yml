@@ -59,6 +59,9 @@ stages:
   - create_tag
   - package
   - release
+  # Post-ship sync (back-merge). Its own stage so `when: always` can run it
+  # even when a job in `release` failed after the tag was pushed.
+  - sync
 
 variables:
   # CUSTOMIZE: the image your toolchain lives in.

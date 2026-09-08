@@ -151,15 +151,28 @@ development_release:
 # Best-effort twice over: backmerge.sh handles every non-happy path by
 # warning and exiting 0, and allow_failure guards the rest — a green release
 # pipeline never goes red because of the back-merge.
+#
+# `sync` is a stage of its own, after `release`, with `when: always`. It used
+# to be `stage: release` with `needs: production_release`, but a needed job
+# that fails skips its dependents and GitLab has no "needs, any result" — so a
+# registry refusing an artifact left the default branch behind an already
+# published tag. The ship failing after create_tag does not un-ship the tag.
+#
+# There is no `needs:` here on purpose: `when: always` in a later stage runs
+# regardless of what happened in `release`, which is the whole point. The real
+# gate lives in backmerge.sh, which skips unless the release tag exists.
 backmerge:
-  stage: release
+  stage: sync
   extends: .myci_setup
-  needs:
-    - job: production_release
-      artifacts: false
   dependencies: []
   allow_failure: true
   script:
     - ci/scripts/backmerge.sh
   rules:
-    - !reference [.release_rules, rules]
+    # Same branch condition as .release_rules, but `when: always` instead of
+    # its `when: on_success` — referencing .release_rules here would re-skip
+    # the job whenever the release stage went red, which is the case this job
+    # exists to survive.
+    - if: '$CI_COMMIT_BRANCH =~ /^release\/[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: always
+    - when: never
