@@ -57,11 +57,25 @@ events triggered with `GITHUB_TOKEN` don't fire workflows.
 progress: tag creation, release creation, and the back-merge all treat
 "already exists" as success.
 
-**Back-merge is best-effort.** After a production ship, an auto-merge MR/PR
-syncs `release/X.Y.Z` back into the default branch. Every non-happy path (no
-diff, already open, conflicts, missing token) warns and exits 0, and the job
-additionally carries `allow_failure` / `continue-on-error` — a green release
-pipeline never goes red because of the back-merge.
+**Back-merge is best-effort, and gated on the tag.** After a production ship,
+an MR/PR syncs `release/X.Y.Z` back into the default branch. Every non-happy
+path (no diff, already open, conflicts, missing token) warns and exits 0, and
+the job additionally carries `allow_failure` / `continue-on-error` — a green
+release pipeline never goes red because of the back-merge.
+
+It runs in its own job, and that job runs even when the ship job failed
+(`when: always` in the `sync` stage on GitLab, `!cancelled()` on GitHub). A
+ship is not atomic: by the time `publish.sh` runs, `create_release_tag.sh` has
+pushed `X.Y.Z` and the forge release exists. That history is permanent, so a
+registry refusing an artifact afterwards must not leave the default branch
+behind a released tag. `backmerge.sh` makes the actual decision — it skips
+unless the release tag exists, so a ship that failed *before* tagging syncs
+nothing.
+
+On GitHub, where the native auto-merge queue needs `allow_auto_merge` plus a
+protection rule or ruleset that a free private repo cannot have, `lib.sh`
+watches the back-merge PR's own checks and merges it when they are green,
+rather than leaving it open for a human.
 
 **Notifications are optional and never gate.** `notify.sh` no-ops without
 `MYCI_NOTIFY_WEBHOOK` and always exits 0; it sits inside `cmd || (notify;
@@ -86,7 +100,7 @@ debugging.
 | `gen_changelog.sh` | conventional-commit changelog | no |
 | `create_release_tag.sh` | version from branch → tag + changelog + dotenv | no |
 | `create_release.sh` | forge release from tag + notes | no |
-| `backmerge.sh` | release → default auto-merge request | no |
+| `backmerge.sh` | release → default sync request, merged when green | no |
 | `notify.sh` | optional webhook (generic/feishu/slack) | no |
 
 Version/data flow on the production path:

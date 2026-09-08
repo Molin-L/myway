@@ -31,8 +31,12 @@
 - **Branch protection**: protect `main`/`master`, `pre-release/*`, and
   `release/*` with "require PR before merging" + the `build` and `test` checks.
   The merge permission on `release/*` is the deploy gate.
-- **Auto-merge**: enable "Allow auto-merge" in repo settings, or the back-merge
-  PR stays open unmerged (backmerge.sh warns and continues).
+- **Auto-merge**: optional. Enable "Allow auto-merge" in repo settings and give
+  the default branch a protection rule or ruleset, and GitHub's queue lands the
+  back-merge PR. Without both — and on a private repo without a paid plan you
+  cannot have either; `allow_auto_merge` silently stays `false` and
+  protection/rulesets return 403 — backmerge.sh falls back to watching the PR's
+  own checks and merging it itself. Nothing to configure for that path.
 - **Optional secrets/variables**: `MYCI_NOTIFY_WEBHOOK` (secret),
   `MYCI_NOTIFY_STYLE` (variable).
 
