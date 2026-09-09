@@ -123,6 +123,23 @@ export MYCI_FORGE MYCI_BRANCH MYCI_TAG MYCI_PROJECT MYCI_PROJECT_URL \
 # release/X.Y.Z -> X.Y.Z
 myci_release_version() { printf '%s' "${1#release/}"; }
 
+# Usage: myci_tag_exists VERSION
+# True when the production tag for VERSION is present locally or on origin.
+# Accepts the bare semver this pipeline creates and a `v` prefix, so a repo
+# that tags `v1.2.3` by hand is still recognized. A remote lookup failure is
+# not a missing tag — the caller must not act on a flaked network — so a
+# failed `ls-remote` re-reports whatever the local check found.
+myci_tag_exists() {
+  local v="$1" t
+  for t in "$v" "v$v"; do
+    git rev-parse -q --verify "refs/tags/${t}" >/dev/null 2>&1 && return 0
+  done
+  for t in "$v" "v$v"; do
+    [ -n "$(git ls-remote --tags origin "refs/tags/${t}" 2>/dev/null)" ] && return 0
+  done
+  return 1
+}
+
 _myci_git_identity() {
   git config user.email >/dev/null 2>&1 || git config user.email "${MYCI_GIT_EMAIL:-ci@my-ci.invalid}"
   git config user.name  >/dev/null 2>&1 || git config user.name  "${MYCI_GIT_NAME:-my-ci}"
@@ -261,6 +278,126 @@ myci_create_release() {
 }
 
 # --- Back-merge (best-effort, never fails the caller) --------------------
+# Usage: _myci_gh_land_backmerge PR_URL
+# Gets a back-merge PR merged on GitHub without a human. Always returns 0 —
+# the release has already shipped by the time this runs, so nothing here is
+# worth failing over.
+#
+# Native auto-merge is tried first, but it cannot be relied on: it needs
+# `allow_auto_merge` on the repo AND a branch protection rule or ruleset for
+# the queue to wait on, and on a private repo without a paid plan none of that
+# is available — a PATCH setting allow_auto_merge is accepted while the field
+# stays false, and protection and rulesets return 403. Where the queue cannot
+# be armed, poll the PR's own checks and merge once they are green.
+#
+# If no checks are ever reported — a PR opened with GITHUB_TOKEN triggers no
+# workflows — that is not an error: the branch is the commit the release
+# pipeline just built and tested. After MYCI_BACKMERGE_GRACE seconds of
+# silence, merge on that basis and say so in the log.
+#
+# Every forge read can flake, so an unreadable value re-polls instead of being
+# read as a zero.
+#
+#   MYCI_BACKMERGE_TIMEOUT  seconds to wait for checks to conclude (default 1800)
+#   MYCI_BACKMERGE_GRACE    seconds to wait for any check to appear (default 180)
+#   MYCI_BACKMERGE_POLL     seconds between polls (default 20)
+_myci_gh_land_backmerge() {
+  local pr_url="$1"
+  local timeout="${MYCI_BACKMERGE_TIMEOUT:-1800}"
+  local grace="${MYCI_BACKMERGE_GRACE:-180}"
+  local poll="${MYCI_BACKMERGE_POLL:-20}"
+  local waited=0 state
+  # Elapsed time is counted in units of `poll`, so a zero would spin forever.
+  _myci_is_uint "$poll" && [ "$poll" -gt 0 ] || poll=20
+
+  # `gh` merges outright when the PR is already mergeable and nothing is
+  # required, so re-read the PR below rather than trust silence here.
+  gh pr merge "$pr_url" --auto --merge >/dev/null 2>&1
+
+  while :; do
+    state=$(gh pr view "$pr_url" --json state --jq '.state' 2>/dev/null)
+    case "$state" in
+      MERGED) myci_log "back-merge merged: ${pr_url}"; return 0 ;;
+      CLOSED) myci_warn "back-merge PR was closed without merging: ${pr_url}"; return 0 ;;
+      OPEN)   _myci_gh_backmerge_step "$pr_url" "$waited" "$grace" && return 0 ;;
+      *)      ;;  # unreadable — fall through and re-poll
+    esac
+
+    if [ "$waited" -ge "$timeout" ]; then
+      myci_warn "back-merge PR ${pr_url} did not become mergeable within ${timeout}s; leaving it open for a human (a bot-opened PR's runs can sit in action_required until someone approves them)"
+      return 0
+    fi
+    sleep "$poll"
+    waited=$((waited + poll))
+  done
+}
+
+# Usage: _myci_gh_backmerge_step PR_URL WAITED GRACE
+# One poll of an open back-merge PR. Returns 0 when the caller is done (auto-
+# merge armed, merge attempted, or a check failed), 1 to keep polling.
+#
+# The check state comes from `gh pr view --json statusCheckRollup`, NOT from
+# `gh pr checks`: on a PR with no checks the latter exits 1 and prints prose
+# instead of JSON, which a numeric guard cannot tell apart from a flaked read,
+# so the no-checks path never fires and the job waits out its whole timeout.
+# The rollup returns [] with exit 0, which is the distinction this needs.
+#
+# The rollup mixes two node shapes: a CheckRun carries .conclusion (null until
+# it finishes), a StatusContext carries .state. Neither is present on the
+# other, so `.conclusion // .state` reads both, and a still-running CheckRun
+# falls through to "" and counts as pending.
+#
+# ACTION_REQUIRED is not a wait: a run held for approval never concludes on
+# its own, and waiting for one only delays a sync of an already-released
+# commit. (A bot-opened PR's run is usually held that way and does not appear
+# in the rollup at all, which lands on the no-checks path below.)
+_myci_gh_backmerge_step() {
+  local pr_url="$1" waited="$2" grace="$3" auto counts total failing pending
+
+  auto=$(gh pr view "$pr_url" --json autoMergeRequest --jq '.autoMergeRequest != null' 2>/dev/null)
+  if [ "$auto" = "true" ]; then
+    myci_log "auto-merge is armed on ${pr_url}; GitHub merges it when its checks pass"
+    return 0
+  fi
+
+  counts=$(gh pr view "$pr_url" --json statusCheckRollup --jq '
+    [ (.statusCheckRollup // [])[] | (.conclusion // .state // "") | ascii_upcase ] as $s
+    | [ ($s | length),
+        ([ $s[] | select(IN("FAILURE","ERROR","TIMED_OUT","CANCELLED","STARTUP_FAILURE")) ] | length),
+        ([ $s[] | select(IN("SUCCESS","SKIPPED","NEUTRAL","ACTION_REQUIRED") | not) ] | length) ]
+    | @tsv' 2>/dev/null)
+  IFS=$'\t' read -r total failing pending <<< "$counts"
+  _myci_is_uint "$total" && _myci_is_uint "$failing" && _myci_is_uint "$pending" || return 1
+
+  if [ "$total" -eq 0 ]; then
+    [ "$waited" -ge "$grace" ] || return 1
+    myci_log "no checks reported on ${pr_url} after ${grace}s (a GITHUB_TOKEN-opened PR triggers none, and a run held for approval is not attached) — merging the commit the release pipeline already built and tested"
+    _myci_gh_merge_pr "$pr_url"
+    return 0
+  fi
+
+  if [ "$failing" -gt 0 ]; then
+    myci_warn "${failing} of ${total} check(s) failed on ${pr_url}; leaving it open for a human"
+    return 0
+  fi
+
+  [ "$pending" -eq 0 ] || return 1
+
+  myci_log "all ${total} check(s) concluded on ${pr_url} — merging"
+  _myci_gh_merge_pr "$pr_url"
+  return 0
+}
+
+_myci_gh_merge_pr() {
+  if gh pr merge "$1" --merge >/dev/null 2>&1; then
+    myci_log "back-merge merged: $1"
+  else
+    myci_warn "could not merge $1 (conflicts, or the token lacks merge rights on the default branch); resolve manually"
+  fi
+}
+
+_myci_is_uint() { case "${1:-}" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
 # Usage: myci_open_backmerge SOURCE_BRANCH TARGET_BRANCH
 # Opens (or reuses) an auto-merge MR/PR from the shipped release branch back
 # into the default branch. Every non-happy path warns and returns 0 — a green
@@ -335,8 +472,7 @@ myci_open_backmerge() {
         return 0
       fi
       myci_log "back-merge PR: ${pr_url}"
-      gh pr merge "$pr_url" --auto --merge 2>/dev/null \
-        || myci_warn "auto-merge could not be enabled on ${pr_url} (branch protection or conflicts); resolve manually"
+      _myci_gh_land_backmerge "$pr_url"
       return 0
       ;;
     local)
