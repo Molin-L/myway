@@ -335,8 +335,24 @@ _myci_gh_land_backmerge() {
 # Usage: _myci_gh_backmerge_step PR_URL WAITED GRACE
 # One poll of an open back-merge PR. Returns 0 when the caller is done (auto-
 # merge armed, merge attempted, or a check failed), 1 to keep polling.
+#
+# The check state comes from `gh pr view --json statusCheckRollup`, NOT from
+# `gh pr checks`: on a PR with no checks the latter exits 1 and prints prose
+# instead of JSON, which a numeric guard cannot tell apart from a flaked read,
+# so the no-checks path never fires and the job waits out its whole timeout.
+# The rollup returns [] with exit 0, which is the distinction this needs.
+#
+# The rollup mixes two node shapes: a CheckRun carries .conclusion (null until
+# it finishes), a StatusContext carries .state. Neither is present on the
+# other, so `.conclusion // .state` reads both, and a still-running CheckRun
+# falls through to "" and counts as pending.
+#
+# ACTION_REQUIRED is not a wait: a run held for approval never concludes on
+# its own, and waiting for one only delays a sync of an already-released
+# commit. (A bot-opened PR's run is usually held that way and does not appear
+# in the rollup at all, which lands on the no-checks path below.)
 _myci_gh_backmerge_step() {
-  local pr_url="$1" waited="$2" grace="$3" auto total pending failing
+  local pr_url="$1" waited="$2" grace="$3" auto counts total failing pending
 
   auto=$(gh pr view "$pr_url" --json autoMergeRequest --jq '.autoMergeRequest != null' 2>/dev/null)
   if [ "$auto" = "true" ]; then
@@ -344,32 +360,30 @@ _myci_gh_backmerge_step() {
     return 0
   fi
 
-  total=$(gh pr checks "$pr_url" --json state --jq 'length' 2>/dev/null)
-  _myci_is_uint "$total" || return 1   # unreadable, not "no checks" — re-poll
+  counts=$(gh pr view "$pr_url" --json statusCheckRollup --jq '
+    [ (.statusCheckRollup // [])[] | (.conclusion // .state // "") | ascii_upcase ] as $s
+    | [ ($s | length),
+        ([ $s[] | select(IN("FAILURE","ERROR","TIMED_OUT","CANCELLED","STARTUP_FAILURE")) ] | length),
+        ([ $s[] | select(IN("SUCCESS","SKIPPED","NEUTRAL","ACTION_REQUIRED") | not) ] | length) ]
+    | @tsv' 2>/dev/null)
+  IFS=$'\t' read -r total failing pending <<< "$counts"
+  _myci_is_uint "$total" && _myci_is_uint "$failing" && _myci_is_uint "$pending" || return 1
 
   if [ "$total" -eq 0 ]; then
     [ "$waited" -ge "$grace" ] || return 1
-    myci_log "no checks reported on ${pr_url} after ${grace}s (a GITHUB_TOKEN-opened PR triggers none) — merging the commit the release pipeline already built and tested"
+    myci_log "no checks reported on ${pr_url} after ${grace}s (a GITHUB_TOKEN-opened PR triggers none, and a run held for approval is not attached) — merging the commit the release pipeline already built and tested"
     _myci_gh_merge_pr "$pr_url"
     return 0
   fi
 
-  failing=$(gh pr checks "$pr_url" --json state --jq \
-    '[.[] | select(.state | IN("FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "STARTUP_FAILURE"))] | length' 2>/dev/null)
-  _myci_is_uint "$failing" || return 1
   if [ "$failing" -gt 0 ]; then
     myci_warn "${failing} of ${total} check(s) failed on ${pr_url}; leaving it open for a human"
     return 0
   fi
 
-  # SKIPPED and NEUTRAL are conclusions, not waits: a job skipped by a rule
-  # (or already satisfied by another run on the same commit) is not pending.
-  pending=$(gh pr checks "$pr_url" --json state --jq \
-    '[.[] | select(.state | IN("SUCCESS", "SKIPPED", "NEUTRAL") | not)] | length' 2>/dev/null)
-  _myci_is_uint "$pending" || return 1
   [ "$pending" -eq 0 ] || return 1
 
-  myci_log "all ${total} check(s) green on ${pr_url} — merging"
+  myci_log "all ${total} check(s) concluded on ${pr_url} — merging"
   _myci_gh_merge_pr "$pr_url"
   return 0
 }
