@@ -463,13 +463,23 @@ myci_open_backmerge() {
       if [ -n "$pr_url" ]; then
         myci_log "reusing existing back-merge PR: ${pr_url}"
       else
+        # Keep gh's stderr: "no commits between" is the benign re-run case
+        # (the release is already in the default branch) and should not read
+        # as an alarm; anything else is worth quoting verbatim.
+        local err; err="$(mktemp)"
         pr_url=$(gh pr create --head "$source" --base "$target" --title "$title" \
           --body "Automated back-merge of production release ${version} into ${target}." \
-          2>/dev/null || true)
-      fi
-      if [ -z "$pr_url" ]; then
-        myci_warn "could not open back-merge PR '${source}' -> '${target}' (no diff, or missing permissions)"
-        return 0
+          2>"$err" || true)
+        if [ -z "$pr_url" ]; then
+          if grep -qi "no commits between" "$err"; then
+            myci_log "'${target}' already contains '${source}' — nothing to back-merge"
+          else
+            myci_warn "could not open back-merge PR '${source}' -> '${target}': $(tr '\n' ' ' <"$err")"
+          fi
+          rm -f "$err"
+          return 0
+        fi
+        rm -f "$err"
       fi
       myci_log "back-merge PR: ${pr_url}"
       _myci_gh_land_backmerge "$pr_url"

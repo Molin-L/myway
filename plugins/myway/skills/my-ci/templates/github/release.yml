@@ -95,13 +95,26 @@ jobs:
           ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
       - name: Tag, package, release, publish
+        id: release
         run: |
           chmod +x ci/scripts/*.sh
           ci/scripts/create_release_tag.sh
           set -a; . ./release.env; set +a
+          cat release.env >> "$GITHUB_ENV"
           ci/scripts/package.sh
           ci/scripts/create_release.sh
           ci/scripts/publish.sh
+      # CUSTOMIZE: if this repo publishes to further registries (npm, PyPI, a
+      # container registry), give each its own step here, gated on the
+      # release existing rather than on the previous registry's success:
+      #
+      #   - name: Publish to <registry>
+      #     if: ${{ !cancelled() && steps.release.outcome == 'success' }}
+      #     run: ci/scripts/publish_<registry>.sh
+      #
+      # In one run: block the first refusal skips every registry after it. A
+      # red step still reds the job; it just no longer hides the rest.
+      # release.env is already in GITHUB_ENV for those steps.
       - name: Notify
         if: always()
         run: |
