@@ -90,6 +90,7 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 |---|---|
 | [`plugins/myway/skills/implement-change/SKILL.md`](plugins/myway/skills/implement-change/SKILL.md) | The workflow |
 | [`references/`](plugins/myway/skills/implement-change/references/) | Forge commands, versioning, commits, escort, config |
+| [`plugins/myway/skills/cog/SKILL.md`](plugins/myway/skills/cog/SKILL.md) | `/cog init` · `/cog update` — cognition docs: your model of a system, kept as `docs/cognition/` |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
 
