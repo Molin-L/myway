@@ -14,11 +14,14 @@
     "gitlab",
     "conventional-commits",
     "ci",
-    "release"
+    "release",
+    "goals",
+    "milestones"
   ],
   "skills": [
     "./skills/implement-change",
     "./skills/my-ci",
-    "./skills/cog"
+    "./skills/cog",
+    "./skills/weekly-goal"
   ]
 }

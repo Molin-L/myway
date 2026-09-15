@@ -81,6 +81,37 @@ CI config belonging to the same Forge as `origin`, confirmed by a run actually
 appearing after a push. A `.gitlab-ci.yml` in a GitHub-origin repo is not
 Applicable CI.
 
+### Goals
+
+**Goal**:
+One intended outcome for a week, stored as a GitLab **group** milestone whose
+body holds what to achieve, what it contributes to, and the Criteria. A goal
+may roll over into the next week; then the same milestone is updated.
+_Avoid_: OKR, objective, sprint goal
+
+**Goal group**:
+The GitLab group that owns goal milestones. Chosen once, high enough to
+contain every project a goal touches — issues outside it cannot take the
+milestone.
+
+**Criterion**:
+One checkbox under `## Done when` in a Goal's body: an observable outcome
+that GitLab evidence can confirm. One outcome per checkbox.
+_Avoid_: key result, deliverable
+
+**Window**:
+The date range in which evidence counts for a gap check. Default: the
+trailing 7 days. Bounds the evidence, not which Criteria are checked.
+
+**Evidence**:
+What a gap check is allowed to weigh, in order: issues linked to the Goal's
+milestone (any author), then the user's own GitLab activity. Nothing else.
+
+**Gap**:
+Per Criterion, the verdict `met`, `partial`, or `none` with its citation. A
+`none` or an uncovered `partial` becomes a Gap issue in the project the work
+belongs to, linked to the milestone.
+
 ### Outcomes
 
 **Verification**:

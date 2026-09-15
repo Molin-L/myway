@@ -55,6 +55,24 @@ repo's `CLAUDE.md` / `AGENTS.md` removes the remaining guesswork:
 > Creating a merge or pull request, or watching a pipeline, always goes
 > through the `myway:implement-change` skill.
 
+## Weekly goals
+
+`/weekly-goal` asks three questions, one at a time — what to achieve, what it
+contributes to, how you will know it is done — dedupes the answer against the
+active milestones of your GitLab group, shows the full milestone body, and
+creates or updates it on your say-so.
+
+`/weekly-goal-gap` measures the distance. It resolves a window (default: the
+trailing 7 days) and the goals in scope, gathers evidence from the milestone's
+linked issues first and your own activity second, judges every unchecked
+criterion with a citation, ticks the met ones, prints the gap, and opens issues
+for the rest in the right projects — linked to the milestone, with
+`blocks` / `is_blocked_by` relations where the evidence shows a dependency.
+
+Reads go through `scripts/gitlab_activity.py` (standard library, `glab`
+transport); writes go through `glab api`. One-time setup: the goal group, see
+[config reference](plugins/myway/skills/weekly-goal/references/config.md).
+
 ## Install
 
 **Claude Code**
@@ -90,7 +108,9 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 |---|---|
 | [`plugins/myway/skills/implement-change/SKILL.md`](plugins/myway/skills/implement-change/SKILL.md) | The workflow |
 | [`references/`](plugins/myway/skills/implement-change/references/) | Forge commands, versioning, commits, escort, config |
+| [`plugins/myway/skills/my-ci/SKILL.md`](plugins/myway/skills/my-ci/SKILL.md) | Cross-forge CI scaffolding |
 | [`plugins/myway/skills/cog/SKILL.md`](plugins/myway/skills/cog/SKILL.md) | `/cog init` · `/cog update` — cognition docs: your model of a system, kept as `docs/cognition/` |
+| [`plugins/myway/skills/weekly-goal/SKILL.md`](plugins/myway/skills/weekly-goal/SKILL.md) | Weekly goals as GitLab group milestones, and the gap check |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
 

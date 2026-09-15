@@ -22,6 +22,11 @@ everything else is a symlink; never duplicate skill content.
 - `plugins/myway/skills/<name>/` — one skill each: `SKILL.md` +
   `references/` + optional `templates/` and `scripts/` (scripts committed
   executable).
+- `plugins/myway/commands/<name>.md` — thin slash commands only, for a skill
+  that exposes more than one entry point (e.g. `/weekly-goal-gap`). A command
+  file just points at a `references/*.md` inside the skill; the arc itself
+  lives there so Codex (which does not see `commands/`) gets it through the
+  skill. A command must not share a name with a skill.
 - `.agents/skills/<name>` — relative symlink to the skill dir, so Codex
   discovers skills when working inside this repo. **Adding a skill means
   both registrations**: the `plugin.json` entry AND
@@ -32,5 +37,6 @@ everything else is a symlink; never duplicate skill content.
 
 ## Verification
 
-For skills carrying code: `bash -n` every script, and parse every YAML
-template (GitLab templates need the `!reference` tag registered).
+For skills carrying code: `bash -n` every shell script, `python3 -m
+py_compile` every Python script, and parse every YAML template (GitLab
+templates need the `!reference` tag registered).
