@@ -73,6 +73,16 @@ Reads go through `scripts/gitlab_activity.py` (standard library, `glab`
 transport); writes go through `glab api`. One-time setup: the goal group, see
 [config reference](plugins/myway/skills/weekly-goal/references/config.md).
 
+## Reports
+
+`report` turns results into one self-contained HTML file with a consistent
+look: a sticky nav with a light/dark toggle, house tokens for both themes, and
+D3 charts drawn through those tokens so a theme change needs no redraw. The
+author supplies title, sections, and data; `scripts/report.py new` scaffolds
+the file and `scripts/report.py lint` refuses colour literals, hand-written
+nav, missing captions, and unfilled placeholders. The palette and the reasons
+behind it: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md).
+
 ## Install
 
 **Claude Code**
@@ -111,6 +121,7 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 | [`plugins/myway/skills/my-ci/SKILL.md`](plugins/myway/skills/my-ci/SKILL.md) | Cross-forge CI scaffolding |
 | [`plugins/myway/skills/cog/SKILL.md`](plugins/myway/skills/cog/SKILL.md) | `/cog init` · `/cog update` — cognition docs: your model of a system, kept as `docs/cognition/` |
 | [`plugins/myway/skills/weekly-goal/SKILL.md`](plugins/myway/skills/weekly-goal/SKILL.md) | Weekly goals as GitLab group milestones, and the gap check |
+| [`plugins/myway/skills/report/SKILL.md`](plugins/myway/skills/report/SKILL.md) | House-style HTML reports: one template, light/dark toggle, D3 charts on a fixed palette |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
 

@@ -14,9 +14,9 @@
         "name": "Molin. L"
       },
       "source": "./plugins/myway",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "category": "workflow",
-      "tags": ["git", "github", "gitlab", "conventional-commits", "ci", "release"],
+      "tags": ["git", "github", "gitlab", "conventional-commits", "ci", "release", "report"],
       "homepage": "https://github.com/Molin-L/myway"
     }
   ]
