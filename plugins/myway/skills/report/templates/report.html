@@ -436,8 +436,14 @@ window.Report = (function (d3) {
       yGrid(g, y, w, opts);
       g.append("g").attr("class", "rp-x").attr("transform", "translate(0," + h + ")").call(d3.axisBottom(x0).tickSize(0).tickPadding(8));
       g.append("line").attr("class", "rp-baseline").attr("x1", 0).attr("x2", w).attr("y1", h).attr("y2", h);
-      var x1 = grouped ? d3.scaleBand().domain(names).range([0, x0.bandwidth()]).paddingInner(0.15) : null;
-      var bw = Math.min(24, grouped ? x1.bandwidth() : x0.bandwidth());
+      // Bars of one group stay side by side. A sub-band scale would centre each
+      // bar in its own slot, so the 24px cap pushes the bars of a group apart
+      // until the group reads as separate bars. Lay the group out from its centre.
+      var nS = grouped ? names.length : 1;
+      var bw = Math.min(24, (x0.bandwidth() / nS) * (grouped ? 0.85 : 1));
+      var gap = grouped ? Math.min(4, bw * 0.2) : 0;
+      var groupW = nS * bw + (nS - 1) * gap;
+      var groupX = function (label) { return x0(label) + (x0.bandwidth() - groupW) / 2; };
       function path(x, top) {
         var r = Math.min(4, bw / 2, Math.max(0, h - top)); var x2 = x + bw;
         return "M" + x + "," + h + "V" + (top + r) + "Q" + x + "," + top + " " + (x + r) + "," + top +
@@ -445,8 +451,8 @@ window.Report = (function (d3) {
       }
       var rows = [];
       data.forEach(function (d) {
-        if (grouped) names.forEach(function (n, i) { rows.push({ label: d.label, name: n, i: i, v: d.values[n], x: x0(d.label) + x1(n) + (x1.bandwidth() - bw) / 2 }); });
-        else rows.push({ label: d.label, name: null, i: 0, v: d.value, x: x0(d.label) + (x0.bandwidth() - bw) / 2 });
+        if (grouped) names.forEach(function (n, i) { rows.push({ label: d.label, name: n, i: i, v: d.values[n], x: groupX(d.label) + i * (bw + gap) }); });
+        else rows.push({ label: d.label, name: null, i: 0, v: d.value, x: groupX(d.label) });
       });
       g.selectAll("path.rp-bar").data(rows).join("path").attr("class", "rp-bar")
         .attr("d", function (r) { return path(r.x, y(Math.max(0, r.v))); })
