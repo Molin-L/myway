@@ -131,6 +131,51 @@ def lint_colors(text: str, L: Lint) -> None:
             L.err(f"line {line_of(text, jm.start())}: colour literal in a D3 style/attr call; use var(--token) or Report.series[i]")
 
 
+def call_text(text: str, start: int) -> str:
+    """Return the source of one `Report.x(...)` call, from `start` to its closing paren.
+
+    Skips string literals, so a unit such as "Latency (ms)" does not close the call early.
+    """
+    i = text.find("(", start)
+    if i < 0:
+        return text[start:]
+    depth, quote = 0, None
+    j = i
+    while j < len(text):
+        c = text[j]
+        if quote:
+            if c == "\\":
+                j += 1
+            elif c == quote:
+                quote = None
+        elif c in "\"'`":
+            quote = c
+        elif c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return text[start : j + 1]
+        j += 1
+    return text[start:]
+
+
+def lint_axis_titles(text: str, cm: re.Match, fid: str, L: Lint) -> None:
+    """Every value axis carries a title with the quantity and its unit, e.g. `yLabel: "Latency (ms)"`."""
+    form = cm.group(1)
+    src = call_text(text, cm.start())
+    ln = line_of(text, cm.start())
+    value_axis = "xLabel" if form == "hbar" else "yLabel"
+    if not re.search(r"\b" + value_axis + r"\s*:", src):
+        L.warn(f"line {ln}: figure #{fid}: Report.{form} without {value_axis} (title the value axis with quantity and unit, e.g. \"Latency (ms)\")")
+    else:
+        lm = re.search(value_axis + r"\s*:\s*([\"'`])(.*?)\1", src)
+        if lm and not re.search(r"\([^)]+\)|%", lm.group(2)):
+            L.warn(f"line {ln}: figure #{fid}: {value_axis} \"{lm.group(2)}\" has no unit in parentheses (write \"Requests (count)\" or \"Share (%)\")")
+    if form == "line" and not re.search(r"\bxLabel\s*:", src):
+        L.warn(f"line {ln}: figure #{fid}: Report.line without xLabel (name the x quantity and its unit or time zone, e.g. \"Day (UTC)\")")
+
+
 def lint_structure(text: str, L: Lint) -> None:
     if 'localStorage.getItem("rp-theme")' not in text:
         L.err("theme bootstrap script is missing (data-theme is not set before paint)")
@@ -171,13 +216,21 @@ def lint_structure(text: str, L: Lint) -> None:
             L.err(f"line {ln}: figure without an id (charts are addressed by id)")
         else:
             fig_ids.append((idm.group(1), ln))
-        if "<figcaption" not in body:
+        cap = re.search(r"<figcaption\b[^>]*>(.*?)</figcaption>", body, re.S)
+        if not cap:
             L.err(f"line {ln}: figure without a <figcaption> (name the source)")
+        elif not re.match(r"\s*(Figure|Fig\.)\s+\d+", re.sub(r"<[^>]+>", "", cap.group(1))):
+            L.warn(f"line {ln}: figcaption does not start with 'Figure N.' (number every figure so prose can cite it)")
         if "rp-figure__title" not in body:
             L.warn(f"line {ln}: figure without a .rp-figure__title")
+        if "rp-figure__sub" not in body:
+            L.warn(f"line {ln}: figure without a .rp-figure__sub (state quantity, unit, window, and n)")
     for fid, ln in fig_ids:
-        if not re.search(r"Report\.\w+\(\s*[\"']#" + re.escape(fid) + r"[\"']", text) and "<svg" not in text[text.find(f'id="{fid}"'):]:
+        cm = re.search(r"Report\.(\w+)\(\s*[\"']#" + re.escape(fid) + r"[\"']", text)
+        if not cm and "<svg" not in text[text.find(f'id="{fid}"'):]:
             L.warn(f"line {ln}: figure #{fid} has no Report.* call and no inline <svg>")
+        if cm:
+            lint_axis_titles(text, cm, fid, L)
     # tables
     for tm in re.finditer(r"<table\b([^>]*)>", text):
         if "rp-table" not in tm.group(1):

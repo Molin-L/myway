@@ -47,9 +47,19 @@ Replace the comment between `<!-- SECTIONS:BEGIN -->` and `<!-- SECTIONS:END -->
 
 ### 4. Add the figures
 
-For each chart: a `figure.rp-figure` with an `id`, a title, a sub with units and window, and a `figcaption` with the source. Then a `Report.*` call in a `<script>` after the runtime, with the data as literals. Pick the form from the table in [references/charts.md](references/charts.md). One message per figure. No dual axis. At most eight series, in a fixed order that holds across the whole report.
+A figure must stand on its own, with no help from the prose. The full requirements are in [references/charts.md](references/charts.md#figure-requirements). For each chart:
 
-A figure with many values also gets a table.
+- `figure.rp-figure` with an `id`.
+- `.rp-figure__title`: the finding as a sentence.
+- `.rp-figure__sub`: the quantity, the unit, the window with time zone, the sample size, and the statistic (`median`, `p99`).
+- `figcaption`: `Figure N.` first, then the source and the method.
+- A `Report.*` call in a `<script>` after the runtime, with the data as literals.
+- `yLabel` (`xLabel` for `hbar`) on the value axis: quantity and unit in parentheses, `"Latency (ms)"`, `"Requests (count)"`, `"Share (%)"`.
+- `xLabel` on the category or time axis: `"Region"`, `"Day (UTC)"`. Required on every line chart.
+
+Pick the form from the table in [references/charts.md](references/charts.md). One message per figure. No dual axis. One unit per quantity across the whole report. At most eight series, in a fixed order that holds across the whole report.
+
+A figure with many values also gets a table, with the unit in the column header.
 
 ### 5. Lint
 
@@ -57,11 +67,11 @@ A figure with many values also gets a table.
 scripts/report.py lint <out.html>
 ```
 
-Fix every error. Read every warning and act on it or say why not. The lint checks the theme bootstrap, the toggle, the nav container, section ids and headings, figure ids and captions, unfilled placeholders, colour literals outside the token block, and remote resources other than the D3 CDN.
+Fix every error. Read every warning and act on it or say why not. The lint checks the theme bootstrap, the toggle, the nav container, section ids and headings, figure ids and captions, figure numbers, the sub line, axis titles and their units, unfilled placeholders, colour literals outside the token block, and remote resources other than the D3 CDN.
 
 ### 6. Look at it
 
-Open the file in a browser if one is available, or screenshot it with a headless one. Check both themes with the toggle: label collisions, overflow, a legend for every multi-series figure, a caption on every figure. If no browser is available, say so in the report to the user, and syntax-check the inline scripts with `node --check` instead.
+Open the file in a browser if one is available, or screenshot it with a headless one. Check both themes with the toggle: label collisions, overflow, a legend for every multi-series figure, a caption on every figure, and a titled value axis with a unit on every chart. Read each figure with the prose hidden. If you cannot tell the unit, the window, or the sample, fix the figure. If no browser is available, say so in the report to the user, and syntax-check the inline scripts with `node --check` instead.
 
 ### 7. Report
 

@@ -184,6 +184,7 @@ small, .rp-muted { color: var(--ink-3); }
 .rp-axis text, .rp-grid text, .rp-x text { fill: var(--ink-3); font-family: var(--font); font-size: 12px; font-variant-numeric: tabular-nums; }
 .rp-baseline { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
 .rp-label { fill: var(--ink-2); font-family: var(--font); font-size: 12px; }
+.rp-axis-title { fill: var(--ink-2); font-family: var(--font); font-size: 12px; font-weight: 500; }
 .rp-crosshair { stroke: var(--axis); stroke-width: 1; pointer-events: none; }
 .rp-tip {
   position: absolute; pointer-events: none; z-index: 5;
@@ -281,14 +282,14 @@ small, .rp-muted { color: var(--ink-3); }
   <section class="rp-section" id="throughput">
     <h2>Throughput</h2>
     <figure class="rp-figure" id="fig-throughput">
-      <p class="rp-figure__title">Requests per day</p>
-      <p class="rp-figure__sub">Last 7 days, thousands</p>
-      <figcaption>Source: gateway access logs. Weekend traffic is lower by design.</figcaption>
+      <p class="rp-figure__title">Weekend traffic is half the weekday level</p>
+      <p class="rp-figure__sub">Requests per day, thousands. 2026-09-07 to 2026-09-13, UTC. n = 7 days.</p>
+      <figcaption>Figure 1. Source: gateway access logs, aggregated per calendar day. Weekend traffic is lower by design.</figcaption>
     </figure>
     <figure class="rp-figure" id="fig-latency">
-      <p class="rp-figure__title">Latency by percentile</p>
-      <p class="rp-figure__sub">Milliseconds, hourly samples</p>
-      <figcaption>Source: gateway metrics. The step on day 4 is the Thursday deploy.</figcaption>
+      <p class="rp-figure__title">p99 latency rose 10% after the Thursday deploy</p>
+      <p class="rp-figure__sub">Latency (ms) per percentile, daily median of hourly samples. Same window. y axis starts at zero.</p>
+      <figcaption>Figure 2. Source: gateway metrics. The step on day 4 is the Thursday deploy.</figcaption>
     </figure>
   </section>
 
@@ -349,6 +350,7 @@ window.Report = (function (d3) {
   var SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)",
                 "var(--series-5)", "var(--series-6)", "var(--series-7)", "var(--series-8)"];
   var MAX_SERIES = SERIES.length;
+  var AXIS_TITLE_H = 18;
 
   function el(sel) {
     var node = typeof sel === "string" ? document.querySelector(sel) : sel;
@@ -386,11 +388,23 @@ window.Report = (function (d3) {
     var width = figure.clientWidth - 2 * parseFloat(getComputedStyle(figure).paddingLeft) || 600;
     var height = opts.height || 280;
     var m = Object.assign({ top: 12, right: 16, bottom: 28, left: 44 }, opts.margin || {});
+    // Axis titles ("Latency (ms)") take one extra text row on their side.
+    if (opts.xLabel) m.bottom += AXIS_TITLE_H;
+    if (opts.yLabel) m.left += AXIS_TITLE_H;
     var svg = d3.select(figure).insert("svg", "figcaption")
       .attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height)
       .attr("role", "img").attr("aria-label", opts.ariaLabel || (figure.querySelector(".rp-figure__title") || {}).textContent || "");
     var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
-    return { svg: svg, g: g, w: width - m.left - m.right, h: height - m.top - m.bottom };
+    var w = width - m.left - m.right, h = height - m.top - m.bottom;
+    if (opts.xLabel) {
+      svg.append("text").attr("class", "rp-axis-title").attr("text-anchor", "middle")
+        .attr("x", m.left + w / 2).attr("y", height - 4).text(opts.xLabel);
+    }
+    if (opts.yLabel) {
+      svg.append("text").attr("class", "rp-axis-title").attr("text-anchor", "middle")
+        .attr("transform", "translate(12," + (m.top + h / 2) + ") rotate(-90)").text(opts.yLabel);
+    }
+    return { svg: svg, g: g, w: w, h: h };
   }
   function yGrid(g, y, w, opts) {
     g.append("g").attr("class", "rp-grid")
@@ -556,14 +570,14 @@ window.Report = (function (d3) {
   Report.bar("#fig-throughput", [
     { label: "Mon", value: 212 }, { label: "Tue", value: 231 }, { label: "Wed", value: 224 },
     { label: "Thu", value: 198 }, { label: "Fri", value: 205 }, { label: "Sat", value: 112 }, { label: "Sun", value: 102 }
-  ], { format: ",.0f" });
+  ], { format: ",.0f", yLabel: "Requests (thousands)", xLabel: "Day of week" });
 
   var day = function (n) { return new Date(2026, 8, 7 + n); };
   Report.line("#fig-latency", [
     { name: "p50", values: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return { x: day(i), y: [41, 40, 42, 44, 45, 43, 42][i] }; }) },
     { name: "p90", values: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return { x: day(i), y: [98, 101, 97, 121, 124, 120, 118][i] }; }) },
     { name: "p99", values: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return { x: day(i), y: [171, 174, 173, 190, 188, 186, 184][i] }; }) }
-  ], { format: ",.0f", xFormat: "%a" });
+  ], { format: ",.0f", xFormat: "%a", yLabel: "Latency (ms)", xLabel: "Day (UTC)" });
 </script>
 <!-- EXAMPLE:END -->
 </body>

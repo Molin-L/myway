@@ -41,21 +41,22 @@ The one number a report leads with. At most one per report.
 
 ## Figure (chart holder)
 
-A chart lives in a figure with an `id`. Title says what is plotted, sub says units and window, caption names the source. The runtime inserts the legend and the SVG between the sub and the caption.
+A chart lives in a figure with an `id`. The title states the finding, the sub states the quantity, the unit, the window, and the sample, and the caption starts with the figure number and names the source. The runtime inserts the legend and the SVG between the sub and the caption. The full list of required parts is in [charts.md](charts.md#figure-requirements).
 
 ```html
 <figure class="rp-figure" id="fig-requests">
-  <p class="rp-figure__title">Requests per day</p>
-  <p class="rp-figure__sub">Last 7 days, thousands</p>
-  <figcaption>Source: gateway access logs.</figcaption>
+  <p class="rp-figure__title">Weekend traffic is half the weekday level</p>
+  <p class="rp-figure__sub">Requests per day, thousands. 2026-09-07 to 2026-09-13, UTC. n = 7 days.</p>
+  <figcaption>Figure 1. Source: gateway access logs, aggregated per calendar day.</figcaption>
 </figure>
 ```
 
-Then, in the data script at the end of the body:
+Then, in the data script at the end of the body. The axis titles carry the unit; the lint warns when they are missing:
 
 ```html
 <script>
-  Report.bar("#fig-requests", [{ label: "Mon", value: 212 }, { label: "Tue", value: 231 }], { format: ",.0f" });
+  Report.bar("#fig-requests", [{ label: "Mon", value: 212 }, { label: "Tue", value: 231 }],
+    { format: ",.0f", yLabel: "Requests (thousands)", xLabel: "Day of week" });
 </script>
 ```
 
