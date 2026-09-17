@@ -13,6 +13,7 @@ The template ships a small D3 runtime, `window.Report`. It draws three forms wit
 | Change over time, one to eight series | line | `Report.line` |
 | Change over time with a volume feel, one series | area line | `Report.line` with `{ area: true }` |
 | Exact values the reader will look up | table | `.rp-table` |
+| A measure against a target or an SLO | the same form, plus a reference line | `rule: { value, label }` |
 
 Never a dual axis. Two measures on different scales become two figures side by side in `.rp-cols`, or one indexed to a common base. Never a pie for more than two slices; use a horizontal bar. Never more than eight series; fold the rest into "Other" or split into small multiples.
 
@@ -45,13 +46,14 @@ Report.bar("#fig-by-region", [
 | `ticks` | `5` | y gridlines |
 | `labels` | auto | `true` / `false` / `"all"`. Auto labels a single series with at most 12 bars |
 | `series` | keys of `values` | explicit series order for grouped data |
+| `rule` | none | a reference line: `{ value: 200, label: "Target 200 ms" }`, or an array of them |
 | `margin` | `{top:12,right:16,bottom:28,left:44}` | override single sides |
 
 ## `Report.hbar(selector, data, opts)`
 
 Same single-series data as `bar`. Height grows with the row count. Use it when labels are long or there are more than about eight categories. Sort the data by value before you pass it, unless the categories have a natural order.
 
-Extra option: `labelWidth` (default `140`) for the left margin that holds the category names. The value axis is horizontal, so its title goes in `xLabel`: `{ xLabel: "Build time (s)" }`.
+Extra option: `labelWidth` (default `140`) for the left margin that holds the category names. The value axis is horizontal, so its title goes in `xLabel`: `{ xLabel: "Build time (s)" }`. `rule` works here too; the line stands vertical.
 
 ## `Report.line(selector, series, opts)`
 
@@ -65,6 +67,8 @@ Report.line("#fig-latency", [
 
 `x` is a `Date` for a time axis or a number for a linear axis. All series share one x and one y scale.
 
+A series may carry `dashed: true`. Use it for a series that is not a measurement: a target, a plan, a model. The legend swatch becomes a dashed bar, so the reader sees which line it is. A dashed series still takes its slot colour.
+
 | Option | Default | Meaning |
 |---|---|---|
 | `format` | `",~f"` | y format for ticks, end labels, tooltip |
@@ -77,13 +81,41 @@ Report.line("#fig-latency", [
 | `area` | `false` | a 10% wash under each line |
 | `curve` | `"linear"` | `"smooth"` for a monotone curve |
 | `labels` | `true` | end-of-line value labels, shown for at most four series |
+| `log` | `false` | a log y axis. The runtime appends `(log)` to `yLabel` for you. A value at or below zero drops out and leaves a gap |
+| `points` | auto | `true` / `false`. Auto marks every point when the longest series has at most 12 |
+| `rule` | none | a reference line: `{ value: 200, label: "SLO 200 ms" }`, or an array of them |
 | `height`, `margin`, `ticks` | as `bar` | |
+
+### Reference lines
+
+`rule` draws the line the data is judged against: an SLO, a budget, last quarter, a physical limit. It is not a series. It wears `--axis` with a dash, it takes no slot colour, and it carries its own label at the end of the line. `report.py lint` warns on a `rule` with no `label`.
+
+```js
+Report.line("#fig-latency", series, {
+  yLabel: "Latency (ms)", xLabel: "Day (UTC)",
+  rule: { value: 200, label: "SLO 200 ms" }
+});
+```
+
+### Missing data
+
+A missing point is `{ x: …, y: null }`. Write it; do not drop the row and do not write a zero.
+
+- The line breaks and leaves a gap. It does not join across the hole and it does not fall to zero.
+- The point stays out of the axis domain, so one hole does not move the scale.
+- A bar with no value leaves an empty slot. `hbar` still prints the category name.
+- A figure with no drawable point at all prints `no data` in the plot, in `--ink-3`.
+- **Say it in the sub line.** `n = 7 days, 2 missing (scrape gap)`. The gap is visible, but the reader needs the reason.
 
 ## Mark specs the runtime applies
 
 - Bars at most 24px thick, 4px rounded data-end, square at the baseline, a surface gap between neighbours from band padding.
-- Lines 2px with round joins. End dots 8px with a 2px `--surface` ring.
+- Lines 2px with round joins. End dots 8px with a 2px `--surface` ring. A `dashed` series uses a 5-4 dash.
+- Point dots 6px with a 1.5px `--surface` ring, on a sparse series only.
+- Reference lines hairline `--axis`, 5-4 dash, label at the end in `--ink-2`.
 - Gridlines hairline, `--grid`. Baseline `--axis`. No axis domain path.
+- A hover on a legend item holds that series and drops the others to 18% opacity.
+- An empty plot says `no data` in `--ink-3`, centred.
 - Axis titles in `--ink-2`, 12px, centred on the axis. The y title is rotated 90°. Each title adds 18px of margin on its side.
 - Legend above the plot for two or more series. None for one series: the figure title names it.
 - Tooltip on hover: per bar, or a crosshair with every series at that x on a line chart.
@@ -117,7 +149,7 @@ A figure must stand on its own. A reader who sees only the figure, with no prose
 - **The y axis starts at zero** for bars always and for lines by default. If a line uses `zero: false`, the sub says `y axis starts at <min>`.
 - **State the sample.** `n = 7 days`, `n = 1 240 requests`, `3 runs per point`. If a point is an aggregate, name the statistic: `median`, `mean`, `p99`.
 - **State uncertainty when it exists.** The runtime draws no error bars, so give the spread in the sub or the caption: `mean of 3 runs, range ±4%`, and put per-run values in a table.
-- **No truncated or broken axes, no log scale without `(log)` in the axis title,** and no secondary axis at all.
+- **No truncated or broken axes and no secondary axis at all.** For a log axis pass `log: true`; the runtime writes `(log)` into the axis title. Never scale the values by hand under a linear title.
 
 ### Rules for the author
 

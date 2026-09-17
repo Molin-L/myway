@@ -30,7 +30,7 @@ Both themes are **selected** values, not an automatic inversion. The values come
 | `--ink-2` | secondary text, legend, labels | `#52514e` | `#c3c2b7` |
 | `--ink-3` | muted: axis ticks, captions, meta | `#898781` | `#898781` |
 | `--grid` | hairline gridlines | `#e1e0d9` | `#2c2c2a` |
-| `--axis` | baseline, crosshair | `#c3c2b7` | `#383835` |
+| `--axis` | baseline, crosshair, reference line | `#c3c2b7` | `#383835` |
 | `--delta-up` | a good change, as text | `#006300` | `#0ca30c` |
 | `--accent` | links, callout rule | `var(--series-1)` | `var(--series-1)` |
 

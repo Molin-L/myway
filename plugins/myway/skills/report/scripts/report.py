@@ -176,6 +176,20 @@ def lint_axis_titles(text: str, cm: re.Match, fid: str, L: Lint) -> None:
         L.warn(f"line {ln}: figure #{fid}: Report.line without xLabel (name the x quantity and its unit or time zone, e.g. \"Day (UTC)\")")
 
 
+def lint_rule_labels(text: str, cm: re.Match, fid: str, L: Lint) -> None:
+    """A reference line is a mark; the house style gives every mark a word. Each `rule` entry needs a `label`."""
+    src = call_text(text, cm.start())
+    rm = re.search(r"\brule\s*:\s*", src)
+    if not rm:
+        return
+    seg = src[rm.end():]
+    values = len(re.findall(r"\bvalue\s*:", seg))
+    labels = len(re.findall(r"\blabel\s*:", seg))
+    if values and labels < values:
+        ln = line_of(text, cm.start())
+        L.warn(f"line {ln}: figure #{fid}: a reference line has no label (name it, e.g. label: \"SLO 200 ms\")")
+
+
 def lint_structure(text: str, L: Lint) -> None:
     if 'localStorage.getItem("rp-theme")' not in text:
         L.err("theme bootstrap script is missing (data-theme is not set before paint)")
@@ -231,6 +245,7 @@ def lint_structure(text: str, L: Lint) -> None:
             L.warn(f"line {ln}: figure #{fid} has no Report.* call and no inline <svg>")
         if cm:
             lint_axis_titles(text, cm, fid, L)
+            lint_rule_labels(text, cm, fid, L)
     # tables
     for tm in re.finditer(r"<table\b([^>]*)>", text):
         if "rp-table" not in tm.group(1):
