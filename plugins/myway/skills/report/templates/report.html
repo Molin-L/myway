@@ -186,6 +186,15 @@ small, .rp-muted { color: var(--ink-3); }
 .rp-label { fill: var(--ink-2); font-family: var(--font); font-size: 12px; }
 .rp-axis-title { fill: var(--ink-2); font-family: var(--font); font-size: 12px; font-weight: 500; }
 .rp-crosshair { stroke: var(--axis); stroke-width: 1; pointer-events: none; }
+.rp-rule { stroke: var(--axis); stroke-width: 1; stroke-dasharray: 5 4; }
+.rp-rule-label { fill: var(--ink-2); font-family: var(--font); font-size: 12px; }
+.rp-dot { stroke: var(--surface); stroke-width: 1.5; }
+.rp-empty { fill: var(--ink-3); font-family: var(--font); font-size: 12px; }
+/* legend hover: the other series step back, they do not vanish */
+.rp-figure [data-s] { transition: opacity .12s; }
+.rp-figure [data-s].is-dim { opacity: .18; }
+.rp-legend li { cursor: default; }
+.rp-legend .rp-swatch.is-dashed { height: .25rem; border-radius: 1px; }
 .rp-tip {
   position: absolute; pointer-events: none; z-index: 5;
   background: var(--surface); color: var(--ink-1); border: 1px solid var(--border);
@@ -371,14 +380,58 @@ window.Report = (function (d3) {
       hide: function () { tip.style.display = "none"; }
     };
   }
-  function legend(figure, names) {
+  /* A point is drawable when its value is a finite number; on a log axis it
+     must also be positive. Anything else leaves a gap, it does not break the
+     path and it does not move the axis. */
+  function ok(v, log) { return v != null && isFinite(v) && (!log || v > 0); }
+  function drawable(values, log) { return values.filter(function (d) { return ok(d.y, log); }); }
+  function lastOf(values, log) { var d = drawable(values, log); return d.length ? d[d.length - 1] : null; }
+  function noData(g, w, h) {
+    g.append("text").attr("class", "rp-empty").attr("x", w / 2).attr("y", h / 2)
+      .attr("text-anchor", "middle").attr("dominant-baseline", "middle").text("no data");
+  }
+  /* Reference lines: a target, an SLO, last quarter. Not a series, so they wear
+     --axis and a dash, never a series colour. Each one carries its own label. */
+  function rules(g, opts, scale, horizontal, w, h) {
+    var list = opts.rule ? (Array.isArray(opts.rule) ? opts.rule : [opts.rule]) : [];
+    list.forEach(function (r) {
+      if (!ok(r.value, opts.log)) return;
+      var p = scale(r.value);
+      var ln = g.append("line").attr("class", "rp-rule");
+      if (horizontal) ln.attr("x1", 0).attr("x2", w).attr("y1", p).attr("y2", p);
+      else ln.attr("x1", p).attr("x2", p).attr("y1", 0).attr("y2", h);
+      if (r.label) {
+        var t = g.append("text").attr("class", "rp-rule-label").text(r.label);
+        if (horizontal) t.attr("x", w).attr("y", p - 5).attr("text-anchor", "end");
+        else t.attr("x", p + 5).attr("y", 10);
+      }
+    });
+  }
+  /* Legend hover: the hovered series keeps its colour, the rest step back. The
+     marks are found at hover time, so a redraw in between does no harm. */
+  function spotlight(figure, i) {
+    var marks = figure.querySelectorAll("[data-s]");
+    for (var k = 0; k < marks.length; k++) {
+      marks[k].classList.toggle("is-dim", i != null && marks[k].getAttribute("data-s") !== String(i));
+    }
+  }
+  function legend(figure, items) {
     var old = figure.querySelector(".rp-legend"); if (old) old.remove();
-    if (names.length < 2) return;
+    if (items.length < 2) return;
     var ul = document.createElement("ul"); ul.className = "rp-legend";
-    names.forEach(function (n, i) {
+    items.forEach(function (it, i) {
+      var name = typeof it === "string" ? it : it.name;
       var li = document.createElement("li");
-      var sw = document.createElement("span"); sw.className = "rp-swatch"; sw.style.background = SERIES[i];
-      li.appendChild(sw); li.appendChild(document.createTextNode(n)); ul.appendChild(li);
+      var sw = document.createElement("span"); sw.className = "rp-swatch";
+      if (it && it.dashed) {
+        sw.classList.add("is-dashed");
+        sw.style.background = "repeating-linear-gradient(90deg," + SERIES[i] + " 0 4px, transparent 4px 7px)";
+      } else {
+        sw.style.background = SERIES[i];
+      }
+      li.appendChild(sw); li.appendChild(document.createTextNode(name)); ul.appendChild(li);
+      li.addEventListener("pointerenter", function () { spotlight(figure, i); });
+      li.addEventListener("pointerleave", function () { spotlight(figure, null); });
     });
     var sub = figure.querySelector(".rp-figure__sub") || figure.querySelector(".rp-figure__title");
     sub ? sub.after(ul) : figure.prepend(ul);
@@ -401,14 +454,18 @@ window.Report = (function (d3) {
         .attr("x", m.left + w / 2).attr("y", height - 4).text(opts.xLabel);
     }
     if (opts.yLabel) {
+      // A log axis says so in its own title; the reader must never guess the scale.
+      var yl = opts.log && !/\blog\b/i.test(opts.yLabel) ? opts.yLabel + " (log)" : opts.yLabel;
       svg.append("text").attr("class", "rp-axis-title").attr("text-anchor", "middle")
-        .attr("transform", "translate(12," + (m.top + h / 2) + ") rotate(-90)").text(opts.yLabel);
+        .attr("transform", "translate(12," + (m.top + h / 2) + ") rotate(-90)").text(yl);
     }
     return { svg: svg, g: g, w: w, h: h };
   }
   function yGrid(g, y, w, opts) {
-    g.append("g").attr("class", "rp-grid")
-      .call(d3.axisLeft(y).ticks(opts.ticks || 5).tickSize(-w).tickPadding(8).tickFormat(fmt(opts)));
+    var ax = d3.axisLeft(y).tickSize(-w).tickPadding(8).tickFormat(fmt(opts));
+    // A log scale hands back every minor tick; keep the ones the count asks for.
+    if (opts.log) ax.tickValues(y.ticks(opts.ticks || 5)); else ax.ticks(opts.ticks || 5);
+    g.append("g").attr("class", "rp-grid").call(ax);
   }
   function observe(figure, draw) {
     if (figure.__rpObserver) figure.__rpObserver.disconnect();
@@ -432,6 +489,7 @@ window.Report = (function (d3) {
       var x0 = d3.scaleBand().domain(data.map(function (d) { return d.label; })).range([0, w]).paddingInner(0.3).paddingOuter(0.15);
       var maxV = grouped ? d3.max(data, function (d) { return d3.max(names, function (n) { return d.values[n]; }); })
                          : d3.max(data, function (d) { return d.value; });
+      if (!ok(maxV) && opts.max == null) { noData(g, w, h); return; }
       var y = d3.scaleLinear().domain([0, opts.max != null ? opts.max : (maxV || 1)]).nice().range([h, 0]);
       yGrid(g, y, w, opts);
       g.append("g").attr("class", "rp-x").attr("transform", "translate(0," + h + ")").call(d3.axisBottom(x0).tickSize(0).tickPadding(8));
@@ -454,7 +512,11 @@ window.Report = (function (d3) {
         if (grouped) names.forEach(function (n, i) { rows.push({ label: d.label, name: n, i: i, v: d.values[n], x: groupX(d.label) + i * (bw + gap) }); });
         else rows.push({ label: d.label, name: null, i: 0, v: d.value, x: groupX(d.label) });
       });
+      // A missing value leaves an empty slot. It must never read as a zero bar.
+      rows = rows.filter(function (r) { return ok(r.v); });
+      rules(g, opts, y, true, w, h);
       g.selectAll("path.rp-bar").data(rows).join("path").attr("class", "rp-bar")
+        .attr("data-s", function (r) { return r.i; })
         .attr("d", function (r) { return path(r.x, y(Math.max(0, r.v))); })
         .style("fill", function (r) { return SERIES[r.i]; })
         .on("mousemove", function (ev, r) {
@@ -464,6 +526,7 @@ window.Report = (function (d3) {
         }).on("mouseleave", tip.hide);
       if (opts.labels === "all" || (opts.labels !== false && !grouped && data.length <= 12)) {
         g.selectAll("text.rp-label").data(rows).join("text").attr("class", "rp-label")
+          .attr("data-s", function (r) { return r.i; })
           .attr("x", function (r) { return r.x + bw / 2; }).attr("y", function (r) { return y(Math.max(0, r.v)) - 6; })
           .attr("text-anchor", "middle").text(function (r) { return f(r.v); });
       }
@@ -471,57 +534,86 @@ window.Report = (function (d3) {
     draw(); observe(figure, draw);
   }
 
-  /* ---- line: [{name, values:[{x, y}]}] ; x is Date or number ---- */
+  /* ---- line: [{name, values:[{x, y}], dashed}] ; x is Date or number ---- */
   function line(sel, series, opts) {
     opts = opts || {};
     var figure = el(sel);
     checkSeries(series.length);
-    legend(figure, series.map(function (s) { return s.name; }));
+    legend(figure, series.map(function (s) { return { name: s.name, dashed: !!s.dashed }; }));
     var f = fmt(opts), tip = tooltip(figure);
+    var log = !!opts.log;
     var isTime = series.length && series[0].values.length && series[0].values[0].x instanceof Date;
     var xf = opts.xFormat ? (isTime ? d3.timeFormat(opts.xFormat) : d3.format(opts.xFormat)) : (isTime ? d3.timeFormat("%b %d") : d3.format("~f"));
     function draw() {
       var fr = frame(figure, opts), g = fr.g, w = fr.w, h = fr.h;
-      var all = series.flatMap(function (s) { return s.values; });
+      // Only drawable points set the axes. A null or a non-positive value on a
+      // log axis leaves a gap in the line and stays out of the domain.
+      var pts = series.map(function (s) { return drawable(s.values, log); });
+      var all = pts.flat();
+      if (!all.length) { noData(g, w, h); return; }
       var x = (isTime ? d3.scaleTime() : d3.scaleLinear()).domain(d3.extent(all, function (d) { return d.x; })).range([0, w]);
-      var lo = opts.min != null ? opts.min : (opts.zero === false ? d3.min(all, function (d) { return d.y; }) : 0);
-      var y = d3.scaleLinear().domain([lo, opts.max != null ? opts.max : d3.max(all, function (d) { return d.y; })]).nice().range([h, 0]);
+      var dMin = d3.min(all, function (d) { return d.y; }), dMax = d3.max(all, function (d) { return d.y; });
+      var lo = opts.min != null ? opts.min : (log || opts.zero === false ? dMin : 0);
+      var hi = opts.max != null ? opts.max : dMax;
+      if (hi === lo) hi = lo + (Math.abs(lo) || 1);
+      var y = (log ? d3.scaleLog() : d3.scaleLinear()).domain([lo, hi]).nice().range([h, 0]);
       yGrid(g, y, w, opts);
       g.append("g").attr("class", "rp-x").attr("transform", "translate(0," + h + ")").call(d3.axisBottom(x).ticks(opts.xTicks || 6).tickSize(0).tickPadding(8).tickFormat(xf));
       g.append("line").attr("class", "rp-baseline").attr("x1", 0).attr("x2", w).attr("y1", h).attr("y2", h);
-      var ln = d3.line().x(function (d) { return x(d.x); }).y(function (d) { return y(d.y); }).curve(opts.curve === "smooth" ? d3.curveMonotoneX : d3.curveLinear);
+      rules(g, opts, y, true, w, h);
+      var defined = function (d) { return ok(d.y, log); };
+      var ln = d3.line().defined(defined).x(function (d) { return x(d.x); }).y(function (d) { return y(d.y); }).curve(opts.curve === "smooth" ? d3.curveMonotoneX : d3.curveLinear);
       if (opts.area) {
-        var ar = d3.area().x(function (d) { return x(d.x); }).y0(h).y1(function (d) { return y(d.y); }).curve(opts.curve === "smooth" ? d3.curveMonotoneX : d3.curveLinear);
-        g.selectAll("path.rp-area").data(series).join("path").attr("class", "rp-area").attr("d", function (s) { return ar(s.values); })
+        var ar = d3.area().defined(defined).x(function (d) { return x(d.x); }).y0(h).y1(function (d) { return y(d.y); }).curve(opts.curve === "smooth" ? d3.curveMonotoneX : d3.curveLinear);
+        g.selectAll("path.rp-area").data(series).join("path").attr("class", "rp-area")
+          .attr("data-s", function (s, i) { return i; })
+          .attr("d", function (s) { return ar(s.values); })
           .style("fill", function (s, i) { return SERIES[i]; }).style("fill-opacity", 0.1);
       }
       g.selectAll("path.rp-line").data(series).join("path").attr("class", "rp-line")
+        .attr("data-s", function (s, i) { return i; })
         .attr("d", function (s) { return ln(s.values); })
         .style("fill", "none").style("stroke", function (s, i) { return SERIES[i]; })
+        .style("stroke-dasharray", function (s) { return s.dashed ? "5 4" : null; })
         .style("stroke-width", 2).style("stroke-linejoin", "round").style("stroke-linecap", "round");
-      // end markers: 8px dot with a 2px surface ring
-      var ends = series.map(function (s, i) { return { i: i, d: s.values[s.values.length - 1] }; });
+      // A sparse series reads as a trend it does not have; mark its points.
+      var mark = opts.points === true || (opts.points !== false && all.length && d3.max(pts, function (p) { return p.length; }) <= 12);
+      if (mark) {
+        var marks = [];
+        pts.forEach(function (p, i) { p.forEach(function (d) { marks.push({ i: i, d: d }); }); });
+        g.selectAll("circle.rp-dot").data(marks).join("circle").attr("class", "rp-dot")
+          .attr("data-s", function (m) { return m.i; })
+          .attr("cx", function (m) { return x(m.d.x); }).attr("cy", function (m) { return y(m.d.y); }).attr("r", 3)
+          .style("fill", function (m) { return SERIES[m.i]; });
+      }
+      // end markers: 8px dot with a 2px surface ring, on the last drawable point
+      var ends = pts.map(function (p, i) { return { i: i, d: p[p.length - 1] }; }).filter(function (e) { return e.d; });
       g.selectAll("circle.rp-end").data(ends).join("circle").attr("class", "rp-end")
+        .attr("data-s", function (e) { return e.i; })
         .attr("cx", function (e) { return x(e.d.x); }).attr("cy", function (e) { return y(e.d.y); }).attr("r", 4)
         .style("fill", function (e) { return SERIES[e.i]; }).style("stroke", "var(--surface)").style("stroke-width", 2);
       if (opts.labels !== false && series.length <= 4) {
         g.selectAll("text.rp-label").data(ends).join("text").attr("class", "rp-label")
+          .attr("data-s", function (e) { return e.i; })
           .attr("x", function (e) { return x(e.d.x) + 8; }).attr("y", function (e) { return y(e.d.y) + 4; })
           .text(function (e) { return f(e.d.y); });
       }
       // crosshair + tooltip
       var cross = g.append("line").attr("class", "rp-crosshair").attr("y1", 0).attr("y2", h).style("display", "none");
       var dots = g.append("g").style("display", "none");
-      dots.selectAll("circle").data(series).join("circle").attr("r", 4)
-        .style("fill", function (s, i) { return SERIES[i]; }).style("stroke", "var(--surface)").style("stroke-width", 2);
       var bis = d3.bisector(function (d) { return d.x; }).center;
       g.append("rect").attr("width", w).attr("height", h).style("fill", "none").style("pointer-events", "all")
         .on("mousemove", function (ev) {
           var px = d3.pointer(ev, this)[0], xv = x.invert(px);
-          var rows = series.map(function (s, i) { var k = bis(s.values, xv); return { i: i, name: s.name, d: s.values[k] }; });
+          // A series with no point near this x drops out of the read-out.
+          var rows = [];
+          pts.forEach(function (p, i) { if (p.length) rows.push({ i: i, name: series[i].name, d: p[bis(p, xv)] }); });
+          if (!rows.length) return;
           var ax = x(rows[0].d.x);
           cross.style("display", null).attr("x1", ax).attr("x2", ax);
-          dots.style("display", null).selectAll("circle").data(rows).attr("cx", function (r) { return x(r.d.x); }).attr("cy", function (r) { return y(r.d.y); });
+          dots.style("display", null).selectAll("circle").data(rows).join("circle").attr("r", 4)
+            .attr("cx", function (r) { return x(r.d.x); }).attr("cy", function (r) { return y(r.d.y); })
+            .style("fill", function (r) { return SERIES[r.i]; }).style("stroke", "var(--surface)").style("stroke-width", 2);
           var p = d3.pointer(ev, figure);
           tip.show("<div class='rp-tip__head'>" + xf(rows[0].d.x) + "</div>" + rows.map(function (r) {
             return "<div><span class='rp-swatch' style='background:" + SERIES[r.i] + "'></span>" + (r.name || "") + "<span class='rp-tip__val'>" + f(r.d.y) + "</span></div>";
@@ -542,13 +634,18 @@ window.Report = (function (d3) {
       var rowH = 32;
       var o = Object.assign({ height: data.length * rowH + 24, margin: { top: 4, right: 48, bottom: 20, left: opts.labelWidth || 140 } }, opts);
       var fr = frame(figure, o), g = fr.g, w = fr.w, h = fr.h;
+      var maxV = d3.max(data, function (d) { return d.value; });
+      if (!ok(maxV) && opts.max == null) { noData(g, w, h); return; }
+      // The band keeps every category, so a missing value shows its name and no bar.
+      var bars = data.filter(function (d) { return ok(d.value); });
       var y = d3.scaleBand().domain(data.map(function (d) { return d.label; })).range([0, h]).paddingInner(0.3);
-      var x = d3.scaleLinear().domain([0, opts.max != null ? opts.max : d3.max(data, function (d) { return d.value; }) || 1]).nice().range([0, w]);
+      var x = d3.scaleLinear().domain([0, opts.max != null ? opts.max : (maxV || 1)]).nice().range([0, w]);
       g.append("g").attr("class", "rp-grid").call(d3.axisBottom(x).ticks(opts.ticks || 5).tickSize(h).tickPadding(6).tickFormat(f));
       g.append("g").attr("class", "rp-axis").call(d3.axisLeft(y).tickSize(0).tickPadding(8)).select(".domain").remove();
       g.append("line").attr("class", "rp-baseline").attr("x1", 0).attr("x2", 0).attr("y1", 0).attr("y2", h);
+      rules(g, opts, x, false, w, h);
       var bh = Math.min(24, y.bandwidth());
-      g.selectAll("path.rp-bar").data(data).join("path").attr("class", "rp-bar")
+      g.selectAll("path.rp-bar").data(bars).join("path").attr("class", "rp-bar")
         .attr("d", function (d) {
           var top = y(d.label) + (y.bandwidth() - bh) / 2, end = x(d.value), r = Math.min(4, bh / 2, end);
           return "M0," + top + "H" + (end - r) + "Q" + end + "," + top + " " + end + "," + (top + r) + "V" + (top + bh - r) +
@@ -558,7 +655,7 @@ window.Report = (function (d3) {
         .on("mousemove", function (ev, d) { var p = d3.pointer(ev, figure); tip.show("<div class='rp-tip__head'>" + d.label + "</div>" + f(d.value), p[0], p[1]); })
         .on("mouseleave", tip.hide);
       if (opts.labels !== false) {
-        g.selectAll("text.rp-label").data(data).join("text").attr("class", "rp-label")
+        g.selectAll("text.rp-label").data(bars).join("text").attr("class", "rp-label")
           .attr("x", function (d) { return x(d.value) + 6; }).attr("y", function (d) { return y(d.label) + y.bandwidth() / 2 + 4; })
           .text(function (d) { return f(d.value); });
       }

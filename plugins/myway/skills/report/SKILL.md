@@ -56,6 +56,8 @@ A figure must stand on its own, with no help from the prose. The full requiremen
 - A `Report.*` call in a `<script>` after the runtime, with the data as literals.
 - `yLabel` (`xLabel` for `hbar`) on the value axis: quantity and unit in parentheses, `"Latency (ms)"`, `"Requests (count)"`, `"Share (%)"`.
 - `xLabel` on the category or time axis: `"Region"`, `"Day (UTC)"`. Required on every line chart.
+- A missing value is `y: null`, never a zero and never a dropped row. The mark leaves a gap; the sub says how many points are missing and why.
+- A target, an SLO, or a budget is `rule: { value, label }`. It is a reference line, not a series, and it always carries a label.
 
 Pick the form from the table in [references/charts.md](references/charts.md). One message per figure. No dual axis. One unit per quantity across the whole report. At most eight series, in a fixed order that holds across the whole report.
 
@@ -67,7 +69,7 @@ A figure with many values also gets a table, with the unit in the column header.
 scripts/report.py lint <out.html>
 ```
 
-Fix every error. Read every warning and act on it or say why not. The lint checks the theme bootstrap, the toggle, the nav container, section ids and headings, figure ids and captions, figure numbers, the sub line, axis titles and their units, unfilled placeholders, colour literals outside the token block, and remote resources other than the D3 CDN.
+Fix every error. Read every warning and act on it or say why not. The lint checks the theme bootstrap, the toggle, the nav container, section ids and headings, figure ids and captions, figure numbers, the sub line, axis titles and their units, reference lines without a label, unfilled placeholders, colour literals outside the token block, and remote resources other than the D3 CDN.
 
 ### 6. Look at it
 
