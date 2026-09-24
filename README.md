@@ -76,11 +76,13 @@ transport); writes go through `glab api`. One-time setup: the goal group, see
 ## Reports
 
 `report` turns results into one self-contained HTML file with a consistent
-look: a sticky nav with a light/dark toggle, house tokens for both themes, and
-D3 charts drawn through those tokens so a theme change needs no redraw. The
-author supplies title, sections, and data; `scripts/report.py new` scaffolds
-the file and `scripts/report.py lint` refuses colour literals, hand-written
-nav, missing captions, and unfilled placeholders. The palette and the reasons
+look: a floating left outline built from the `h2`–`h4` headings (so many and
+nested topics fit; a drawer on narrow screens), a sticky top bar with a
+light/dark toggle, house tokens for both themes, and D3 charts drawn through
+those tokens so a theme change needs no redraw. The author supplies title,
+sections, and data; `scripts/report.py new` scaffolds the file and
+`scripts/report.py lint` refuses colour literals, a missing outline,
+duplicate ids, missing captions, and unfilled placeholders. The palette and the reasons
 behind it: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md).
 
 ## Install

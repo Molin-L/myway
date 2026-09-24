@@ -1,20 +1,20 @@
 ---
 name: report
-description: Generate a self-contained HTML report in the house style — one template, light/dark theme with a toggle in the nav bar, D3 charts through a fixed token palette. Use when the user says "report", "html report", "write this up as a page", "make a dashboard page", "generate a report from this data", or wants results, benchmarks, an audit, or a weekly summary as a shareable HTML file. Do NOT use for a Markdown summary in chat, for slides, or for weekly goals on GitLab (that is `weekly-goal`).
+description: Generate a self-contained HTML report in the house style — one template, a floating left outline built from the section headings (h2–h4, so many and nested topics fit), light/dark theme with a toggle in the top bar, D3 charts through a fixed token palette. Use when the user says "report", "html report", "write this up as a page", "make a dashboard page", "generate a report from this data", or wants results, benchmarks, an audit, or a weekly summary as a shareable HTML file. Do NOT use for a Markdown summary in chat, for slides, or for weekly goals on GitLab (that is `weekly-goal`).
 ---
 
 # Report
 
-A report is one HTML file. It comes from `templates/report.html`, which carries the house tokens for both themes, a sticky nav with the theme toggle, and a D3 runtime that draws charts in the house marks. The author supplies the title, the sections, and the data. The style is not a choice.
+A report is one HTML file. It comes from `templates/report.html`, which carries the house tokens for both themes, a sticky top bar with the theme toggle, a floating outline on the left that builds itself from the headings, and a D3 runtime that draws charts in the house marks. The author supplies the title, the sections, and the data. The style is not a choice.
 
 Paths are relative to this skill directory. Under Claude Code that is `${CLAUDE_PLUGIN_ROOT}/skills/report/`.
 
 | File | Contents |
 |---|---|
 | `scripts/report.py` | `new` scaffolds a report, `lint` checks one, `tokens` lists the tokens |
-| `templates/report.html` | The template: tokens, nav, toggle, components, chart runtime, an example body |
-| [references/house-style.md](references/house-style.md) | Tokens, type, layout, the theme mechanism, what may not change |
-| [references/components.md](references/components.md) | HTML blocks: section, tiles, hero, figure, table, status, callout, key–value |
+| `templates/report.html` | The template: tokens, top bar, outline, toggle, components, chart runtime, an example body |
+| [references/house-style.md](references/house-style.md) | Tokens, type, layout, the outline, the theme mechanism, what may not change |
+| [references/components.md](references/components.md) | HTML blocks: section and sub-topics, tiles, hero, figure, table, status, callout, key–value |
 | [references/charts.md](references/charts.md) | `Report.bar` / `hbar` / `line` API, form choice, mark specs, author rules |
 
 ## The arc
@@ -25,7 +25,7 @@ Settle these before you write. Ask only for what the request and the workspace d
 
 - **Title, subtitle, author, date.** Date defaults to today. Author defaults to `git config user.name`.
 - **Output path.** Default `reports/<yyyy-mm-dd>-<slug>.html` in the current repo, or the path the user named.
-- **Sections.** Three to six. The first is a summary that states the findings before any chart.
+- **Sections.** As many as the content needs; the outline holds them all. The first is a summary that states the findings before any chart. Put a topic with parts under its section as `h3` sub-topics (and `h4` below those), not as more sections.
 - **Data.** Where it is, and what each figure should say. If a number has to be computed, compute it now and keep the source at hand for the captions.
 
 ### 2. Scaffold
@@ -34,13 +34,15 @@ Settle these before you write. Ask only for what the request and the workspace d
 scripts/report.py new <out.html> --title "<title>" --subtitle "<sub>" [--author A] [--date YYYY-MM-DD]
 ```
 
-The result has the tokens, the nav, the header, an empty `SECTIONS` region, and the runtime. Use `--with-example` only to show the user the style before content exists.
+The result has the tokens, the top bar, the outline, the header, an empty `SECTIONS` region, and the runtime. Use `--with-example` only to show the user the style before content exists.
 
 ### 3. Write the sections
 
 Replace the comment between `<!-- SECTIONS:BEGIN -->` and `<!-- SECTIONS:END -->` with `section.rp-section` blocks from [references/components.md](references/components.md). Rules:
 
-- Every section has an `id` and starts with an `h2`. The nav builds itself from them.
+- Every section has an `id` and starts with an `h2`. Sub-topics inside it are `h3`, and parts of a sub-topic are `h4`. Give each `h3` and `h4` a short `id`, so a link to it stays stable. The outline builds itself from these headings.
+- Do not skip a level (an `h4` right under an `h2`), and do not use `h5` or `h6`. The outline shows `h2` to `h4` only.
+- For a very long report (more than about 40 outline entries), set `data-expand="active"` on `nav#rp-outline`. The outline then opens only the branch the reader is in.
 - Lead with the finding. Tiles or a callout first, then the figures, then the table, then the detail.
 - Use house classes only. No inline `style`, no second `<style>` block, no colour literal.
 - Prose follows the same rules as any writing for the user: short sentences, the answer first.
@@ -69,11 +71,11 @@ A figure with many values also gets a table, with the unit in the column header.
 scripts/report.py lint <out.html>
 ```
 
-Fix every error. Read every warning and act on it or say why not. The lint checks the theme bootstrap, the toggle, the nav container, section ids and headings, figure ids and captions, figure numbers, the sub line, axis titles and their units, reference lines without a label, unfilled placeholders, colour literals outside the token block, and remote resources other than the D3 CDN.
+Fix every error. Read every warning and act on it or say why not. The lint checks the theme bootstrap, the toggle, the top bar, the outline container and its button, hand-written outline entries, section ids and headings, heading levels, duplicate ids, figure ids and captions, figure numbers, the sub line, axis titles and their units, reference lines without a label, unfilled placeholders, colour literals outside the token block, and remote resources other than the D3 CDN.
 
 ### 6. Look at it
 
-Open the file in a browser if one is available, or screenshot it with a headless one. Check both themes with the toggle: label collisions, overflow, a legend for every multi-series figure, a caption on every figure, and a titled value axis with a unit on every chart. Read each figure with the prose hidden. If you cannot tell the unit, the window, or the sample, fix the figure. If no browser is available, say so in the report to the user, and syntax-check the inline scripts with `node --check` instead.
+Open the file in a browser if one is available, or screenshot it with a headless one. Check both themes with the toggle: label collisions, overflow, a legend for every multi-series figure, a caption on every figure, and a titled value axis with a unit on every chart. Check the outline at a wide window and at a narrow one (below 64rem it becomes a drawer behind the "Contents" button): every section and sub-topic is there, nested under the right parent, and the marked entry follows the scroll. Read each figure with the prose hidden. If you cannot tell the unit, the window, or the sample, fix the figure. If no browser is available, say so in the report to the user, and syntax-check the inline scripts with `node --check` instead.
 
 ### 7. Report
 
@@ -82,7 +84,7 @@ Give the user the path, the section list, and the figures with one line each on 
 ## Rules
 
 - **Never change the tokens in a report.** A colour need becomes a template change in this skill, with both themes stepped and the palette re-validated.
-- **Never hand-write the nav.** It comes from the `h2`s.
+- **Never hand-write the outline.** It comes from the `h2`, `h3`, and `h4` headings inside the sections.
 - **Never fetch data at view time.** The file is self-contained; only D3 loads from the CDN. For an offline reader, save `d3.min.js` beside the file and point the `src` at it.
 - **Never use a status colour as a series colour**, and never a colour without a word beside it.
 - **Do not add a web font.** The house type is the system sans.

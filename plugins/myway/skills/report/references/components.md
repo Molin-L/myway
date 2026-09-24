@@ -4,7 +4,7 @@ Every block below is plain HTML with house classes. Copy the block, fill the tex
 
 ## Section
 
-One `<section>` per nav entry. The `id` is the anchor; the `h2` is the nav label.
+One `<section>` per top-level outline entry. The `id` is the anchor; the `h2` is the outline label.
 
 ```html
 <section class="rp-section" id="throughput">
@@ -12,6 +12,45 @@ One `<section>` per nav entry. The `id` is the anchor; the `h2` is the nav label
   <p>One paragraph that states the finding first.</p>
 </section>
 ```
+
+## Sub-topics
+
+A section with parts uses `h3` for each part and `h4` for a part of a part. The outline nests them under their section. Give each one a short `id`, unique in the file; the lint fails on a duplicate. Do not skip a level, and stop at `h4`.
+
+```html
+<section class="rp-section" id="method">
+  <h2>Method</h2>
+  <h3 id="data-sources">Data sources</h3>
+  <h4 id="source-access-logs">Gateway access logs</h4>
+  <p>…</p>
+  <h4 id="source-metrics">Gateway metrics</h4>
+  <p>…</p>
+  <h3 id="limits">Limits</h3>
+  <p>…</p>
+</section>
+```
+
+The outline shows this as:
+
+```text
+Method
+  Data sources
+    Gateway access logs
+    Gateway metrics
+  Limits
+```
+
+A heading inside any block of the section is an outline entry too (for example the `h3` of a [card](#card)). If a heading must not show in the outline, make it a bold paragraph instead.
+
+## Outline
+
+Already in the template. Do not write entries; the runtime builds them from the headings. The one setting is on the container:
+
+```html
+<nav class="rp-outline" id="rp-outline" aria-label="Contents" data-expand="active">
+```
+
+`data-expand="active"` opens only the branch the reader is in. Use it when the outline has more than about 40 entries. Without it every branch is open.
 
 ## Stat tiles
 

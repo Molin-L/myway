@@ -25,13 +25,14 @@ import os
 import re
 import subprocess
 import sys
+from html.parser import HTMLParser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "..", "templates", "report.html")
 D3_SRC = "https://cdn.jsdelivr.net/npm/d3@7"
 
 EXAMPLE_RE = re.compile(r"<!-- EXAMPLE:BEGIN.*?<!-- EXAMPLE:END -->\n?", re.S)
-SECTIONS_EMPTY = "<!-- SECTIONS:BEGIN -->\n  <!-- sections go here: <section class=\"rp-section\" id=\"...\"><h2>...</h2>...</section> -->\n<!-- SECTIONS:END -->"
+SECTIONS_EMPTY = "<!-- SECTIONS:BEGIN -->\n  <!-- sections go here: <section class=\"rp-section\" id=\"...\"><h2>...</h2>...<h3 id=\"...\">...</h3>...</section> -->\n<!-- SECTIONS:END -->"
 
 
 def read_template() -> str:
@@ -83,6 +84,9 @@ COLOR_FUNC = r"\b(?:rgba?|hsla?|oklch|oklab|color)\("
 STYLE_ATTR_RE = re.compile(r'style\s*=\s*"([^"]*)"|style\s*=\s*\'([^\']*)\'', re.I)
 JS_COLOR_RE = re.compile(r'\.(?:style|attr)\(\s*["\'](?:fill|stroke|color|background[\w-]*)["\']\s*,\s*["\']([^"\']*)["\']')
 PLACEHOLDER_RE = re.compile(r"\{\{[A-Z_]+\}\}")
+# An id attribute in a start tag's attribute string: double-, single-, or
+# unquoted. The lookbehind keeps data-id and xml:id out.
+ID_ATTR_RE = re.compile(r"""(?<![\w:-])id\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>"'=`]+))""", re.I)
 
 
 class Lint:
@@ -190,15 +194,21 @@ def lint_rule_labels(text: str, cm: re.Match, fid: str, L: Lint) -> None:
         L.warn(f"line {ln}: figure #{fid}: a reference line has no label (name it, e.g. label: \"SLO 200 ms\")")
 
 
-def lint_structure(text: str, L: Lint) -> None:
+def lint_structure(text: str, tags: "_Tags", L: Lint) -> None:
     if 'localStorage.getItem("rp-theme")' not in text:
         L.err("theme bootstrap script is missing (data-theme is not set before paint)")
-    if 'id="rp-toggle"' not in text:
-        L.err('nav theme toggle is missing (button id="rp-toggle")')
-    if 'class="rp-nav"' not in text:
-        L.err('sticky nav is missing (nav class="rp-nav")')
-    if 'id="rp-nav-links"' not in text:
-        L.err('nav link container is missing (id="rp-nav-links")')
+    ids = {i for i, _ in tags.ids}
+    if "rp-toggle" not in ids:
+        L.err('theme toggle is missing (button id="rp-toggle")')
+    if "rp-nav" not in tags.classes:
+        L.err('sticky top bar is missing (class="rp-nav")')
+    if "rp-outline" not in ids:
+        hint = "; this file predates the outline, so re-scaffold it with `report.py new` and move the sections over" if "rp-nav-links" in ids else ""
+        L.err(f'outline container is missing (nav id="rp-outline"){hint}')
+    if "rp-outline-toggle" not in ids:
+        L.err('outline button for narrow screens is missing (button id="rp-outline-toggle")')
+    if "rp-layout" not in tags.classes:
+        L.err('layout wrapper is missing (div class="rp-layout" around the outline and <main>)')
     if ":root[data-theme=\"dark\"]" not in text:
         L.err("dark token block is missing (:root[data-theme=\"dark\"])")
     if not re.search(r"<h1[^>]*>\s*\S", text):
@@ -211,10 +221,10 @@ def lint_structure(text: str, L: Lint) -> None:
     for sm in re.finditer(r"<section\b([^>]*)>", text):
         attrs = sm.group(1)
         if "rp-section" not in attrs:
-            L.warn(f"line {line_of(text, sm.start())}: <section> without class rp-section (nav will skip it)")
+            L.warn(f"line {line_of(text, sm.start())}: <section> without class rp-section (the outline skips it)")
             continue
-        if not re.search(r'\bid="[^"]+"', attrs):
-            L.err(f"line {line_of(text, sm.start())}: rp-section without an id (nav needs it)")
+        if not ID_ATTR_RE.search(attrs):
+            L.err(f"line {line_of(text, sm.start())}: rp-section without an id (the outline links to it)")
         rest = text[sm.end():sm.end() + 400]
         if not re.search(r"<h2\b", rest):
             L.err(f"line {line_of(text, sm.start())}: rp-section does not start with an <h2>")
@@ -225,11 +235,11 @@ def lint_structure(text: str, L: Lint) -> None:
         ln = line_of(text, fm.start())
         if "rp-figure" not in attrs:
             L.warn(f"line {ln}: <figure> without class rp-figure")
-        idm = re.search(r'\bid="([^"]+)"', attrs)
+        idm = ID_ATTR_RE.search(attrs)
         if not idm:
             L.err(f"line {ln}: figure without an id (charts are addressed by id)")
         else:
-            fig_ids.append((idm.group(1), ln))
+            fig_ids.append((idm.group(1) or idm.group(2) or idm.group(3), ln, fm.start()))
         cap = re.search(r"<figcaption\b[^>]*>(.*?)</figcaption>", body, re.S)
         if not cap:
             L.err(f"line {ln}: figure without a <figcaption> (name the source)")
@@ -239,9 +249,9 @@ def lint_structure(text: str, L: Lint) -> None:
             L.warn(f"line {ln}: figure without a .rp-figure__title")
         if "rp-figure__sub" not in body:
             L.warn(f"line {ln}: figure without a .rp-figure__sub (state quantity, unit, window, and n)")
-    for fid, ln in fig_ids:
+    for fid, ln, pos in fig_ids:
         cm = re.search(r"Report\.(\w+)\(\s*[\"']#" + re.escape(fid) + r"[\"']", text)
-        if not cm and "<svg" not in text[text.find(f'id="{fid}"'):]:
+        if not cm and "<svg" not in text[pos:]:
             L.warn(f"line {ln}: figure #{fid} has no Report.* call and no inline <svg>")
         if cm:
             lint_axis_titles(text, cm, fid, L)
@@ -250,6 +260,88 @@ def lint_structure(text: str, L: Lint) -> None:
     for tm in re.finditer(r"<table\b([^>]*)>", text):
         if "rp-table" not in tm.group(1):
             L.warn(f"line {line_of(text, tm.start())}: <table> without class rp-table")
+
+
+class _Tags(HTMLParser):
+    """Collect ids, classes, and the outline's headings from real start tags only.
+
+    A parser, not a regex: `id="…"` inside a code sample, a comment, or a
+    script is text, not an attribute, and must not count as an id. The
+    contents of <template> and <noscript> are not part of the live page.
+    """
+
+    INERT = ("template", "noscript")
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.ids: list[tuple[str, int]] = []        # (id, line)
+        self.classes: set[str] = set()
+        self.outline: list[tuple[int, int]] = []    # (level, line); level 0 starts a section.rp-section
+        self.hand_written: list[int] = []           # lines of entries written into the outline
+        self.sections: list[bool] = []              # open <section>s: is it an rp-section?
+        self.outline_depth = 0                      # nav depth inside nav#rp-outline
+        self.inert = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in self.INERT:
+            self.inert += 1
+        if self.inert:
+            return
+        line = self.getpos()[0]
+        ident = next((v for k, v in attrs if k == "id"), None)   # the first one wins, as in a browser; "" names nothing
+        cls = (next((v for k, v in attrs if k == "class" and v), "") or "").split()
+        if ident:
+            self.ids.append((ident, line))
+        self.classes.update(cls)
+        if tag == "section":
+            self.sections.append("rp-section" in cls)
+            if "rp-section" in cls:
+                self.outline.append((0, line))
+        elif any(self.sections) and re.fullmatch(r"h[2-6]", tag):
+            self.outline.append((int(tag[1]), line))
+        if tag == "nav" and (self.outline_depth or ident == "rp-outline"):
+            self.outline_depth += 1
+        elif self.outline_depth and tag in ("a", "ol", "ul", "li"):
+            self.hand_written.append(line)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in self.INERT and self.inert:
+            self.inert -= 1
+        elif self.inert:
+            return
+        elif tag == "section" and self.sections:
+            self.sections.pop()
+        elif tag == "nav" and self.outline_depth:
+            self.outline_depth -= 1
+
+
+def parse_tags(text: str) -> _Tags:
+    tags = _Tags()
+    tags.feed(text)
+    tags.close()
+    return tags
+
+
+def lint_outline(tags: _Tags, L: Lint) -> None:
+    """The outline nests h2 > h3 > h4 and links to ids, so the levels and the ids must be sound."""
+    seen: dict[str, int] = {}
+    for ident, ln in tags.ids:
+        if ident in seen:
+            L.err(f"line {ln}: duplicate id \"{ident}\" (first on line {seen[ident]}); the outline and every link to it go to the first one")
+        else:
+            seen[ident] = ln
+    if tags.hand_written:
+        L.err(f"line {tags.hand_written[0]}: entries are hand-written inside nav#rp-outline; delete them, the runtime builds the outline from the headings")
+    prev = 1
+    for level, ln in tags.outline:
+        if level == 0:  # a new section: its first heading must be an h2
+            prev = 1
+            continue
+        if level > 4:
+            L.warn(f"line {ln}: <h{level}> is not in the outline (it shows h2 to h4); use an h4 or a bold lead-in")
+        elif level > prev + 1:
+            L.warn(f"line {ln}: <h{level}> follows <h{prev}> with no <h{prev + 1}> between (the outline nests by level)")
+        prev = min(level, 4)
 
 
 def lint_remote(text: str, L: Lint, allow_remote: bool) -> None:
@@ -267,7 +359,9 @@ def cmd_lint(a: argparse.Namespace) -> int:
     with open(a.file, encoding="utf-8") as f:
         text = f.read()
     L = Lint()
-    lint_structure(text, L)
+    tags = parse_tags(text)
+    lint_structure(text, tags, L)
+    lint_outline(tags, L)
     lint_colors(text, L)
     lint_remote(text, L, a.allow_remote)
     for w in L.warnings:

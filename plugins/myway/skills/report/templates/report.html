@@ -26,7 +26,7 @@
   color-scheme: light;
   /* planes */
   --plane:        #f9f9f7;   /* page background */
-  --surface:      #fcfcfb;   /* cards, chart surface, nav */
+  --surface:      #fcfcfb;   /* cards, chart surface, top bar, outline */
   --border:       rgba(11, 11, 11, 0.10);
   /* ink */
   --ink-1:        #0b0b0b;   /* primary text */
@@ -66,6 +66,8 @@
   --measure:      72rem;
   --radius:       6px;
   --nav-h:        3.25rem;
+  --outline-w:    15rem;     /* left outline column */
+  --gutter:       2.5rem;    /* outline to content */
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -98,7 +100,12 @@
 
 /* ---------- base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-padding-top: calc(var(--nav-h) + 1rem); }
+/* The top bar is sticky, so it is always in view. Without this, focus on a
+   top-bar control reads as "under the padding" and the page jumps. */
+.rp-nav, .rp-nav * { scroll-margin-top: calc(-1 * (var(--nav-h) + 1rem)); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 body {
   margin: 0;
   background: var(--plane);
@@ -112,6 +119,7 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 .5em; font-weight: 650; letter-spacin
 h1 { font-size: 2rem; }
 h2 { font-size: 1.4rem; margin-top: 0; }
 h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+h4 { font-size: 1rem; margin: 1.25rem 0 .4rem; font-weight: 600; line-height: 1.3; }
 p, ul, ol { margin: 0 0 1em; }
 code, pre { font-family: var(--mono); font-size: .9em; }
 pre {
@@ -121,7 +129,7 @@ pre {
 hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
 small, .rp-muted { color: var(--ink-3); }
 
-/* ---------- nav ---------- */
+/* ---------- top bar: title and theme toggle ---------- */
 .rp-nav {
   position: sticky; top: 0; z-index: 10;
   height: var(--nav-h);
@@ -129,26 +137,86 @@ small, .rp-muted { color: var(--ink-3); }
   border-bottom: 1px solid var(--border);
 }
 .rp-nav__inner {
-  max-width: var(--measure); margin: 0 auto; height: 100%;
+  max-width: calc(var(--measure) + var(--outline-w) + var(--gutter) + 2.5rem); margin: 0 auto; height: 100%;
   padding: 0 1.25rem;
-  display: flex; align-items: center; gap: 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
 }
-.rp-nav__brand { font-weight: 650; color: var(--ink-1); white-space: nowrap; }
-.rp-nav__links { display: flex; gap: 1rem; margin: 0 auto 0 0; overflow-x: auto; }
-.rp-nav__links a { color: var(--ink-2); font-size: .9rem; white-space: nowrap; }
-.rp-nav__links a:hover { color: var(--ink-1); text-decoration: none; }
-.rp-toggle {
+.rp-nav__brand {
+  font-weight: 650; color: var(--ink-1); margin-right: auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rp-nav__brand:hover { text-decoration: none; }
+.rp-toggle, .rp-outline-toggle {
   appearance: none; border: 1px solid var(--border); background: transparent;
   color: var(--ink-2); border-radius: 999px; padding: .3rem .7rem;
-  font: inherit; font-size: .85rem; cursor: pointer;
+  font: inherit; font-size: .85rem; cursor: pointer; flex: none;
   display: inline-flex; align-items: center; gap: .4rem;
 }
-.rp-toggle:hover { color: var(--ink-1); border-color: var(--ink-3); }
-.rp-toggle .rp-toggle__icon { width: 1em; height: 1em; }
+.rp-toggle:hover, .rp-outline-toggle:hover { color: var(--ink-1); border-color: var(--ink-3); }
+.rp-toggle__icon { width: 1em; height: 1em; }
 :root[data-theme="light"] .rp-toggle__label-dark, :root[data-theme="dark"] .rp-toggle__label-light { display: none; }
+.rp-outline-toggle { display: none; }
+
+/* ---------- outline: floating, left, built from the headings ---------- */
+.rp-outline {
+  position: sticky; top: calc(var(--nav-h) + 1.5rem); align-self: start;
+  margin-top: 2.5rem;
+  max-height: calc(100vh - var(--nav-h) - 3rem);
+  overflow-y: auto; scrollbar-width: thin;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 16px rgba(0, 0, 0, .05);
+  padding: .75rem .5rem;
+  font-size: .875rem; line-height: 1.35;
+}
+.rp-outline__title { color: var(--ink-2); font-size: .8rem; font-weight: 600; margin: 0 .5rem .4rem; }
+.rp-outline ol { list-style: none; margin: 0; padding: 0; }
+.rp-outline ol ol { margin: .1rem 0 .25rem .75rem; padding-left: .25rem; border-left: 1px solid var(--grid); }
+.rp-outline a {
+  display: block; padding: .28rem .5rem; border-radius: 4px;
+  color: var(--ink-2); overflow-wrap: anywhere;
+}
+.rp-outline > ol > li > a { color: var(--ink-1); font-weight: 500; }
+.rp-outline ol ol a { font-size: .84rem; }
+.rp-outline ol ol ol a { font-size: .8rem; }
+.rp-outline a:hover { color: var(--ink-1); background: var(--plane); text-decoration: none; }
+.rp-outline a.is-active {
+  color: var(--ink-1); background: var(--plane);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+/* data-expand="active": show a branch only while the reader is inside it */
+.rp-outline[data-expand="active"] li:not(.is-open) > ol { display: none; }
 
 /* ---------- layout ---------- */
-.rp-main { max-width: var(--measure); margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+.rp-layout {
+  max-width: calc(var(--measure) + var(--outline-w) + var(--gutter) + 2.5rem); margin: 0 auto;
+  padding: 0 1.25rem;
+  display: grid; grid-template-columns: var(--outline-w) minmax(0, 1fr); gap: var(--gutter);
+}
+.rp-layout > .rp-main { grid-column: 2; }
+/* No headings: no outline, and the top bar and content narrow to the measure. */
+.rp-no-outline .rp-layout, .rp-no-outline .rp-nav__inner { max-width: calc(var(--measure) + 2.5rem); }
+.rp-no-outline .rp-layout { grid-template-columns: minmax(0, 1fr); }
+.rp-no-outline .rp-layout > .rp-main { grid-column: 1; }
+.rp-main { max-width: var(--measure); min-width: 0; padding: 2.5rem 0 4rem; }
+@media (max-width: 63.99rem) {
+  .rp-layout { display: block; }
+  .rp-outline-toggle { display: inline-flex; }
+  .rp-outline {
+    position: fixed; z-index: 20; top: var(--nav-h); bottom: 0; left: 0;
+    align-self: normal;   /* a fixed box honours align-self; start would stop it short of the bottom */
+    width: min(20rem, 85vw); max-height: none; margin: 0;
+    overscroll-behavior: contain;   /* the drawer covers the page: do not scroll it */
+    border-width: 0 1px 0 0; border-radius: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+    transform: translateX(-100%); visibility: hidden;
+  }
+  .rp-outline.is-open { transform: none; visibility: visible; }
+}
+@media (max-width: 63.99rem) and (prefers-reduced-motion: no-preference) {
+  /* Open: visible at once, so focus can move in. Close: hide after the slide. */
+  .rp-outline { transition: transform .2s ease, visibility 0s linear .2s; }
+  .rp-outline.is-open { transition: transform .2s ease, visibility 0s; }
+}
 .rp-header { margin-bottom: 2.5rem; }
 .rp-header__sub { font-size: 1.15rem; color: var(--ink-2); margin: 0 0 .75rem; }
 .rp-header__meta { color: var(--ink-3); font-size: .9rem; display: flex; gap: 1.25rem; flex-wrap: wrap; }
@@ -228,18 +296,25 @@ small, .rp-muted { color: var(--ink-3); }
 .rp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1rem; }
 
 @media print {
-  .rp-nav { position: static; }
-  .rp-toggle { display: none; }
+  /* The h1 carries the title, so the top bar goes with the outline. */
+  .rp-nav, .rp-outline { display: none; }
+  .rp-layout { display: block; max-width: none; }
+  h2, h3, h4 { break-after: avoid; }
   .rp-figure, .rp-tile, .rp-card { break-inside: avoid; }
 }
 </style>
 </head>
 <body>
 
-<nav class="rp-nav" aria-label="Report navigation">
+<header class="rp-nav">
   <div class="rp-nav__inner">
+    <button class="rp-outline-toggle" id="rp-outline-toggle" type="button" aria-controls="rp-outline" aria-expanded="false">
+      <svg class="rp-toggle__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+        <path d="M2 4h12M5 8h9M5 12h9"/>
+      </svg>
+      <span>Contents</span>
+    </button>
     <a class="rp-nav__brand" href="#top">{{TITLE}}</a>
-    <div class="rp-nav__links" id="rp-nav-links"><!-- built from every section h2[id] --></div>
     <button class="rp-toggle" id="rp-toggle" type="button" aria-label="Toggle colour theme">
       <svg class="rp-toggle__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
         <circle cx="8" cy="8" r="3.25"/>
@@ -249,6 +324,12 @@ small, .rp-muted { color: var(--ink-3); }
       <span class="rp-toggle__label-dark">Dark</span>
     </button>
   </div>
+</header>
+
+<div class="rp-layout">
+<nav class="rp-outline" id="rp-outline" aria-label="Contents">
+  <p class="rp-outline__title">Contents</p>
+  <!-- built at load from every h2, h3, and h4 inside a section.rp-section -->
 </nav>
 
 <main class="rp-main" id="top">
@@ -290,11 +371,14 @@ small, .rp-muted { color: var(--ink-3); }
 
   <section class="rp-section" id="throughput">
     <h2>Throughput</h2>
+    <p>Traffic follows the working week. Latency stepped up on Thursday and did not recover.</p>
+    <h3 id="requests">Requests</h3>
     <figure class="rp-figure" id="fig-throughput">
       <p class="rp-figure__title">Weekend traffic is half the weekday level</p>
       <p class="rp-figure__sub">Requests per day, thousands. 2026-09-07 to 2026-09-13, UTC. n = 7 days.</p>
       <figcaption>Figure 1. Source: gateway access logs, aggregated per calendar day. Weekend traffic is lower by design.</figcaption>
     </figure>
+    <h3 id="latency">Latency</h3>
     <figure class="rp-figure" id="fig-latency">
       <p class="rp-figure__title">p99 latency rose 10% after the Thursday deploy</p>
       <p class="rp-figure__sub">Latency (ms) per percentile, daily median of hourly samples. Same window. y axis starts at zero.</p>
@@ -304,6 +388,7 @@ small, .rp-muted { color: var(--ink-3); }
 
   <section class="rp-section" id="details">
     <h2>Details</h2>
+    <h3 id="services">Services</h3>
     <table class="rp-table">
       <thead><tr><th>Service</th><th>Status</th><th class="num">Requests</th><th class="num">p99 (ms)</th></tr></thead>
       <tbody>
@@ -312,10 +397,22 @@ small, .rp-muted { color: var(--ink-3); }
         <tr><td>order-router</td><td><span class="rp-status is-good">healthy</span></td><td class="num">98,120</td><td class="num">61</td></tr>
       </tbody>
     </table>
+    <h3 id="environment">Environment</h3>
     <dl class="rp-kv">
       <dt>Window</dt><dd>2026-09-07 to 2026-09-13</dd>
       <dt>Environment</dt><dd>production, eu-west-1</dd>
     </dl>
+  </section>
+
+  <section class="rp-section" id="method">
+    <h2>Method</h2>
+    <h3 id="data-sources">Data sources</h3>
+    <h4 id="source-access-logs">Gateway access logs</h4>
+    <p>One line per request. Figure 1 counts the lines per calendar day in UTC.</p>
+    <h4 id="source-metrics">Gateway metrics</h4>
+    <p>Latency histograms, scraped every 5 minutes. Figure 2 takes the hourly percentiles and reports the daily median.</p>
+    <h3 id="limits">Limits</h3>
+    <p>The window is one week. A weekly pattern needs more weeks to confirm.</p>
   </section>
 <!-- EXAMPLE:END -->
 <!-- SECTIONS:END -->
@@ -324,11 +421,12 @@ small, .rp-muted { color: var(--ink-3); }
     Generated {{DATE}} by {{AUTHOR}}.
   </footer>
 </main>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script>
 /* ============================================================
-   Report runtime: theme toggle, nav, and the chart helpers.
+   Report runtime: theme toggle, outline, and the chart helpers.
    Charts set colour through CSS variables, so a theme change
    re-colours every mark with no redraw.
    ============================================================ */
@@ -345,14 +443,166 @@ window.Report = (function (d3) {
     setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
   });
 
-  /* ---- nav from section headings ---- */
-  var links = document.getElementById("rp-nav-links");
-  document.querySelectorAll("section.rp-section > h2[id], section.rp-section[id] > h2").forEach(function (h) {
-    var id = h.id || h.parentElement.id;
-    var a = document.createElement("a");
-    a.href = "#" + id;
-    a.textContent = h.textContent;
-    links.appendChild(a);
+  /* ---- outline: a nested list from the section headings ---- */
+  // An h2 is a top-level entry, an h3 nests under the h2 before it, an h4
+  // under the h3. The first h2 of a section links to the section id; any
+  // other heading links to its own id, made from its text if it has none.
+  var outline = document.getElementById("rp-outline");
+  var outlineBtn = document.getElementById("rp-outline-toggle");
+  var narrow = window.matchMedia("(max-width: 63.99rem)");
+  var entries = [];   // {id, h, a, li} in document order
+
+  function slug(text) {
+    // Drop Latin accents (an "e" with an acute accent becomes "e"), then recompose, so the marks that
+    // other scripts need (Devanagari vowel signs, Japanese dakuten) stay.
+    return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").normalize("NFKC")
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "section";
+  }
+  function uniqueId(base) {
+    var id = base, n = 2;
+    while (document.getElementById(id)) id = base + "-" + n++;
+    return id;
+  }
+  (function build() {
+    var top = document.createElement("ol");
+    var stack = [{ level: 1, list: top, li: null }];
+    document.querySelectorAll("section.rp-section h2, section.rp-section h3, section.rp-section h4").forEach(function (h) {
+      var text = h.textContent.replace(/\s+/g, " ").trim();
+      if (!text) return;
+      var level = +h.tagName.charAt(1);
+      var section = h.closest("section.rp-section");
+      var id;
+      if (level === 2 && section.id && section.querySelector("h2") === h) id = section.id;
+      else id = h.id || (h.id = uniqueId(slug(text)));
+      while (stack[stack.length - 1].level >= level) stack.pop();
+      var parent = stack[stack.length - 1];
+      if (!parent.list) { parent.list = document.createElement("ol"); parent.li.appendChild(parent.list); }
+      var li = document.createElement("li"), a = document.createElement("a");
+      a.href = "#" + id; a.textContent = text;
+      li.appendChild(a); parent.list.appendChild(li);
+      entries.push({ id: id, h: h, a: a, li: li });
+      stack.push({ level: level, list: null, li: li });
+    });
+    if (entries.length) { outline.appendChild(top); return; }
+    outline.hidden = true; outlineBtn.hidden = true;
+    root.classList.add("rp-no-outline");
+  })();
+
+  /* ---- outline: mark the entry the reader is in ---- */
+  var active = -1, pinned = -1, ticking = false;
+  function follow(a) {
+    // Keep the active entry in view inside the outline's own scroll.
+    var r = a.getBoundingClientRect(), o = outline.getBoundingClientRect(), pad = 24;
+    if (r.top < o.top + pad) outline.scrollTop += r.top - o.top - pad;
+    else if (r.bottom > o.bottom - pad) outline.scrollTop += r.bottom - o.bottom + pad;
+  }
+  function setActive(i) {
+    if (i === active) return;
+    if (active >= 0) { entries[active].a.classList.remove("is-active"); entries[active].a.removeAttribute("aria-current"); }
+    outline.querySelectorAll("li.is-open").forEach(function (li) { li.classList.remove("is-open"); });
+    active = i;
+    if (i < 0) return;
+    entries[i].a.classList.add("is-active"); entries[i].a.setAttribute("aria-current", "location");
+    for (var li = entries[i].li; li; li = li.parentElement.closest("li")) li.classList.add("is-open");
+    // Do not scroll the outline under a reader who is scanning it.
+    if (!outline.matches(":hover")) follow(entries[i].a);
+  }
+  function spy() {
+    ticking = false;
+    if (pinned >= 0 || !entries.length) return;
+    // A heading is current once its top passes a line just under the top bar,
+    // where a click on its entry puts it. In the last screen of scroll the line
+    // sweeps down to the bottom, so the short sections at the end still get a turn.
+    var view = window.innerHeight;
+    var line = document.querySelector(".rp-nav").getBoundingClientRect().bottom + 24;
+    var maxScroll = document.documentElement.scrollHeight - view;
+    var span = Math.min(view, maxScroll), remain = maxScroll - window.scrollY;
+    if (span > 0 && remain < span) line += (view - line) * (1 - Math.max(0, remain) / span);
+    // The current entry is the lowest heading above the line. Headings in
+    // side-by-side columns are not in vertical order, so scan them all; skip a
+    // heading with no box (hidden), whose top reads as 0.
+    var cur = 0, best = -Infinity;
+    for (var i = 0; i < entries.length; i++) {
+      var h = entries[i].h;
+      if (!h.getClientRects().length) continue;
+      var t = h.getBoundingClientRect().top;
+      if (t <= line && t >= best) { best = t; cur = i; }
+    }
+    setActive(cur);
+  }
+  function requestSpy() { if (!ticking) { ticking = true; requestAnimationFrame(spy); } }
+  function entryFor(id) {
+    for (var i = 0; id && i < entries.length; i++) if (entries[i].id === id || entries[i].h.id === id) return i;
+    return -1;
+  }
+  function pin(id) {
+    // After a jump, keep the chosen entry marked until the reader scrolls,
+    // clicks, or presses a key; a short section near the end may never reach
+    // the line. A target that is not an entry (or no hash) releases the pin.
+    var i = entryFor(id);
+    if (i >= 0) { pinned = i; setActive(i); } else { pinned = -1; requestSpy(); }
+  }
+  function hashId() { try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return ""; } }
+  if (entries.length) {
+    window.addEventListener("scroll", requestSpy, { passive: true });
+    window.addEventListener("resize", requestSpy);
+    window.addEventListener("load", requestSpy);
+    window.addEventListener("hashchange", function () { pin(hashId()); });
+    ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) {
+      window.addEventListener(t, function () { if (pinned >= 0) { pinned = -1; requestSpy(); } }, { passive: true });
+    });
+    outline.addEventListener("click", function (ev) {
+      var a = ev.target.closest("a");
+      // A modified click opens a new tab or window; this page does not move.
+      if (!a || ev.defaultPrevented || ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      pin(a.getAttribute("href").slice(1));
+      if (narrow.matches) openOutline(false);
+    });
+    // A fresh load jumps to the hash target, so pin it. A reload or a history
+    // load restores the old scroll position instead; pin the target only if
+    // the page still sits where the jump puts it.
+    var nav = performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
+    if (location.hash && (!nav || nav.type === "navigate")) pin(hashId());
+    else if (location.hash) window.addEventListener("load", function () {
+      requestAnimationFrame(function () {
+        var i = entryFor(hashId());
+        if (i < 0) return;
+        var top = entries[i].h.getBoundingClientRect().top;
+        var jumpTop = document.querySelector(".rp-nav").getBoundingClientRect().bottom + 16;
+        var atEnd = window.scrollY >= document.documentElement.scrollHeight - window.innerHeight - 2;
+        if (Math.abs(top - jumpTop) < 4 || (atEnd && top >= 0 && top < window.innerHeight)) pin(entries[i].id);
+      });
+    });
+    requestSpy();
+  }
+
+  /* ---- outline: a drawer on narrow screens ---- */
+  function openOutline(open) {
+    outline.classList.toggle("is-open", open);
+    outlineBtn.setAttribute("aria-expanded", String(open));
+    if (open) {
+      var a = active >= 0 ? entries[active].a : outline.querySelector("a");
+      if (a) { follow(a); a.focus({ preventScroll: true }); }
+    }
+  }
+  outlineBtn.addEventListener("click", function () { openOutline(!outline.classList.contains("is-open")); });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" && outline.classList.contains("is-open")) { openOutline(false); outlineBtn.focus({ preventScroll: true }); }
+  });
+  document.addEventListener("click", function (ev) {
+    if (outline.classList.contains("is-open") && !outline.contains(ev.target) && !outlineBtn.contains(ev.target)) openOutline(false);
+  });
+  // Focus that leaves the drawer goes to content under it; close the drawer.
+  outline.addEventListener("focusout", function (ev) {
+    var to = ev.relatedTarget;
+    if (outline.classList.contains("is-open") && to && !outline.contains(to) && to !== outlineBtn) openOutline(false);
+  });
+  narrow.addEventListener("change", function () {
+    // Crossing the breakpoint must not play the drawer's slide-out.
+    outline.style.transition = "none";
+    openOutline(false);
+    void outline.offsetWidth;
+    requestAnimationFrame(function () { outline.style.transition = ""; });
   });
 
   /* ---- shared ---- */

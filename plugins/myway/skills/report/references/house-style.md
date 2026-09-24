@@ -1,14 +1,15 @@
 # House style
 
-One template, one token block, one look. Every report is a single self-contained HTML file built from `templates/report.html`. The template carries the tokens, the layout, the nav with the theme toggle, and the chart runtime. A report author writes sections and data, nothing else.
+One template, one token block, one look. Every report is a single self-contained HTML file built from `templates/report.html`. The template carries the tokens, the layout, the top bar with the theme toggle, the outline, and the chart runtime. A report author writes sections and data, nothing else.
 
 ## What may not change
 
 | Part | Rule |
 |---|---|
 | Token block | The first `<style>` in the file. The only place a colour literal may appear. Do not add, remove, or rename tokens in a report; change the template instead. |
-| Theme mechanism | `data-theme` on `<html>`, set before paint from `localStorage` (`rp-theme`) or the OS preference. The nav button toggles it. Do not add a second mechanism. |
-| Nav | Sticky, built at load from every `section.rp-section[id] > h2`. Do not hand-write nav links. |
+| Theme mechanism | `data-theme` on `<html>`, set before paint from `localStorage` (`rp-theme`) or the OS preference. The top-bar button toggles it. Do not add a second mechanism. |
+| Top bar | `header.rp-nav`, sticky. It holds the report title, the "Contents" button for narrow screens, and the theme toggle. No section links. |
+| Outline | `nav#rp-outline`, built at load from every `h2`, `h3`, and `h4` inside a `section.rp-section`. Do not hand-write outline entries. See [Outline](#outline). |
 | Chart runtime | `Report.bar`, `Report.hbar`, `Report.line` (see [charts.md](charts.md)). Extend the runtime in the template if a new form is needed; do not paste a one-off D3 snippet with its own colours. |
 | Typeface | System sans (`--font`). No web fonts, no display face, no serif. |
 | Remote resources | D3 from `https://cdn.jsdelivr.net/npm/d3@7` only. For an offline report, save `d3.min.js` next to the file and change the `src`; `report.py lint` accepts either. |
@@ -24,7 +25,7 @@ Both themes are **selected** values, not an automatic inversion. The values come
 | Token | Role | Light | Dark |
 |---|---|---|---|
 | `--plane` | page background | `#f9f9f7` | `#0d0d0d` |
-| `--surface` | cards, figures, nav, tooltips | `#fcfcfb` | `#1a1a19` |
+| `--surface` | cards, figures, top bar, outline, tooltips | `#fcfcfb` | `#1a1a19` |
 | `--border` | hairline ring | `rgba(11,11,11,.10)` | `rgba(255,255,255,.10)` |
 | `--ink-1` | primary text | `#0b0b0b` | `#ffffff` |
 | `--ink-2` | secondary text, legend, labels | `#52514e` | `#c3c2b7` |
@@ -63,20 +64,35 @@ The order is the safety mechanism. Slot 1 is always the first series, slot 2 the
 |---|---|
 | Body | 16px / 1.55, `--ink-1` |
 | `h1` | 2rem, weight 650 |
-| `h2` | 1.4rem, one per section, the nav label |
-| `h3` | 1.1rem, sub-topics inside a section |
-| Measure | `--measure` = 72rem, centred |
-| Radius | `--radius` = 6px on cards, figures, tables, tooltips |
+| `h2` | 1.4rem, one per section, a top-level outline entry |
+| `h3` | 1.1rem, a sub-topic inside a section, nested under its `h2` in the outline |
+| `h4` | 1rem, weight 600, a part of a sub-topic, nested under its `h3`. The deepest level; no `h5` or `h6` |
+| Measure | `--measure` = 72rem, the widest the content column gets |
+| Outline | `--outline-w` = 15rem wide, `--gutter` = 2.5rem to the content. The page is centred as one block of outline and content |
+| Radius | `--radius` = 6px on cards, figures, tables, tooltips, the outline |
 | Figures in text | proportional. `tabular-nums` only in table columns and axis ticks |
 
 Text never wears a series colour. Identity comes from a swatch, a dot, or a mark beside the text.
 
+## Outline
+
+The outline is the report's table of contents. It is a card on the left of the content that stays in view while the page scrolls, and it has its own scroll when the entries do not fit. A top bar cannot hold many topics or show which topic belongs to which; the outline can.
+
+| Behaviour | Rule |
+|---|---|
+| Entries | One per `h2`, `h3`, and `h4` inside a `section.rp-section`, in document order. An `h3` nests under the `h2` before it, an `h4` under the `h3` before it. |
+| Links | The first `h2` of a section links to the section `id`, even if the `h2` has an `id` of its own. Any other heading links to its own `id`. A heading with no `id` gets one from its text at load (`Data sources` becomes `data-sources`), so write a short `id` on each `h3` and `h4` when a link to it must stay stable. |
+| Current entry | The entry for the part the reader is in is marked with an accent rule and `aria-current="location"`. It stays in view inside the outline. After a click on an entry, or on a link to one, that entry stays marked until the reader scrolls, clicks, or presses a key. |
+| Long reports | By default every branch is open. `data-expand="active"` on `nav#rp-outline` opens only the branch the reader is in; use it above about 40 entries. |
+| Narrow screens | Below 64rem the outline leaves the page and becomes a drawer. The "Contents" button in the top bar opens it. A click on an entry, a click outside, `Escape`, or focus that moves to another part of the page closes it. |
+| No headings | The outline and its button hide. The top bar and the content narrow to one centred column of `--measure`. |
+
 ## Theme toggle
 
-The button in the nav (`#rp-toggle`) flips `data-theme` between `light` and `dark` and stores the choice under `rp-theme` in `localStorage`. The bootstrap script in `<head>` reads the stored value before first paint, so the page never flashes. With no stored value the OS preference wins.
+The button in the top bar (`#rp-toggle`) flips `data-theme` between `light` and `dark` and stores the choice under `rp-theme` in `localStorage`. The bootstrap script in `<head>` reads the stored value before first paint, so the page never flashes. With no stored value the OS preference wins.
 
 Charts need no redraw on a toggle. Every mark sets its colour through `var(--series-n)` or `var(--surface)`, so the browser re-resolves the tokens when `data-theme` changes.
 
 ## Print
 
-The nav becomes static and the toggle hides. Figures, tiles, and cards do not break across pages. The printed theme is whatever the screen showed. Toggle to light before you print.
+The top bar and the outline hide; the `h1` carries the title. The content takes the full page width. Figures, tiles, and cards do not break across pages, and a heading stays on the same page as the block after it. The printed theme is whatever the screen showed. Toggle to light before you print.
