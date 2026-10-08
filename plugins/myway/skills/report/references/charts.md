@@ -1,164 +1,101 @@
 # Charts
 
-The template ships a small D3 runtime, `window.Report`. It draws three forms with the house mark specs, a legend for two or more series, a hover tooltip, direct labels where they help, and a responsive redraw. Colours go through tokens, so a theme toggle re-colours every mark with no redraw.
+A chart is a Vega-Lite v5 spec, written as JSON inside the body. The runtime loads Vega from the CDN only when the page has a chart, draws each spec with `vega-embed` at the column's width and 240px high (a spec may set `height`), and themes it from the tokens: Inter, muted axes, hairline grid with no vertical lines, the series palette in fixed order, a legend on top, tooltips on every mark, 2px lines, rounded bar ends, and dashed muted reference lines.
+
+```html
+<figure class="sf-figure" id="fig-latency">
+  <div class="sf-chart"><script type="application/json">
+  { …Vega-Lite spec… }
+  </script></div>
+  <figcaption><strong>Figure 2.</strong> The message. Quantity, window, n. Data: source.</figcaption>
+</figure>
+```
 
 ## Pick the form first
 
-| The data's job | Form | Call |
+| The data's job | Form | Spec |
 |---|---|---|
-| A single headline number | stat tile or hero figure, not a chart | HTML, see [components.md](components.md) |
-| Magnitude across a few categories | column | `Report.bar` |
-| Magnitude across many or long-named categories | horizontal bar | `Report.hbar` |
-| Magnitude across categories, two to four series | grouped column | `Report.bar` with `values` |
-| Change over time, one to eight series | line | `Report.line` |
-| Change over time with a volume feel, one series | area line | `Report.line` with `{ area: true }` |
-| Exact values the reader will look up | table | `.rp-table` |
-| A measure against a target or an SLO | the same form, plus a reference line | `rule: { value, label }` |
+| A single headline number | a stat, not a chart | `div.sf-stats`, see [components.md](components.md) |
+| Magnitude across a few categories | column | `"mark": "bar"`, nominal or ordinal x |
+| Magnitude across many or long-named categories | horizontal bar | `"mark": "bar"`, the category on y, sorted by value unless the order is natural (`"sort": "-x"`) |
+| Magnitude across categories, two to four series | grouped column | bar with `"xOffset": {"field": "series"}` and `"color": {"field": "series"}` |
+| Change over time, one to eight series | line | `"mark": "line"` with a temporal x and a `color` field |
+| Change over time with a volume feel, one series | area | `"mark": "area"` |
+| Relation between two measures | scatter | `"mark": "point"`, at most three series |
+| Exact values the reader will look up | table | `<table>` with `class="num"` columns |
+| A measure against a target or an SLO | the same form plus a reference line | a `layer` with `rule` and `text`, see below |
 
-Never a dual axis. Two measures on different scales become two figures side by side in `.rp-cols`, or one indexed to a common base. Never a pie for more than two slices; use a horizontal bar. Never more than eight series; fold the rest into "Other" or split into small multiples.
+Never a dual axis: two measures on different scales become two figures, or one indexed to a common base. Never a pie or donut (`arc`); use a bar. Never more than eight series; fold the rest into "Other" or split the figure. Use only `line`, `bar`, `point`, `area`, plus `rule` and `text` for reference lines; the lint warns on other marks.
 
-## `Report.bar(selector, data, opts)`
+## What the author writes, and what not
 
-Single series:
+- **Data inline** as `"data": {"values": [...]}`. Never `"url"`: the lint fails on it. The file is self-contained.
+- **No colours, fonts, or config.** No `"config"`, no `"scheme"`, no scale `"range"`, no hex or `rgb()` anywhere in the spec: the lint fails on each. Series get the palette by the order of their first appearance in `values`, so write the series the story is about first, and keep each series in the same slot across every figure.
+- **Long-form data.** One row per point with a series column (`{"day": …, "pct": "p99", "ms": 184}`), encoded as `"color": {"field": "pct", "type": "nominal", "title": null}`. The legend then shows the series names; `"title": null` drops the redundant legend title.
+- **Category order.** Vega-Lite sorts categories alphabetically. Write `"sort": null` to keep the data order (days of the week, quarters).
+- **Time.** Dates as ISO strings with `"type": "temporal"`. For a daily axis add `"timeUnit": "utcyearmonthdate"` and an axis format (`"axis": {"format": "%a %d"}`) so ticks fall on days in UTC.
 
-```js
-Report.bar("#fig-requests", [
-  { label: "Mon", value: 212 }, { label: "Tue", value: 231 }
-], { format: ",.0f", yLabel: "Requests (thousands)", xLabel: "Day of week" });
+## Reference lines
+
+A target, an SLO, a budget, or last quarter's level is a reference line, not a series. Write it as two extra layers, a `rule` and a `text` that names it. The theme draws the rule as a muted 5–4 dash and the text in muted 11px; set no colour.
+
+```json
+{"data": {"values": [ … ]},
+ "layer": [
+   {"mark": {"type": "line", "point": true}, "encoding": { … }},
+   {"mark": "rule", "encoding": {"y": {"datum": 180}}},
+   {"mark": {"type": "text", "align": "left", "dx": 4, "dy": -7},
+    "encoding": {"y": {"datum": 180}, "x": {"value": 0}, "text": {"value": "SLO 180 ms"}}}
+ ]}
 ```
 
-Grouped, two to four series. The key order in `values` is the slot order, so write the keys in the order the legend should show:
+Put the label where the data is not (here the left end, `"x": {"value": 0}`; `"x": {"value": "width"}` with `"align": "right"` for the right end). The lint warns on a `rule` with no `text` layer.
 
-```js
-Report.bar("#fig-by-region", [
-  { label: "Q1", values: { EU: 120, US: 98 } },
-  { label: "Q2", values: { EU: 131, US: 104 } }
-], { yLabel: "Revenue (k EUR)", xLabel: "Quarter (2026)" });
-```
+## Missing data
 
-| Option | Default | Meaning |
-|---|---|---|
-| `format` | `",~f"` | a `d3.format` string for ticks, labels, tooltip |
-| `yLabel` | none | value-axis title, quantity and unit: `"Latency (ms)"`. Required; the lint warns without it |
-| `xLabel` | none | category-axis title: `"Day of week"`, `"Region"`. Omit only when the category labels are self-evident |
-| `height` | `280` | SVG height in px |
-| `max` | data max | top of the y axis |
-| `ticks` | `5` | y gridlines |
-| `labels` | auto | `true` / `false` / `"all"`. Auto labels a single series with at most 12 bars |
-| `series` | keys of `values` | explicit series order for grouped data |
-| `rule` | none | a reference line: `{ value: 200, label: "Target 200 ms" }`, or an array of them |
-| `margin` | `{top:12,right:16,bottom:28,left:44}` | override single sides |
+A missing point is a row with `null` for the value. Write it; do not drop the row and do not write a zero.
 
-## `Report.hbar(selector, data, opts)`
+- A line or area breaks and leaves a gap; it does not join across the hole and does not fall to zero. A bar is simply absent.
+- The null stays out of the axis domain, so one hole does not move the scale.
+- **Say it in the caption:** `n = 7 days, 1 missing (Wednesday scrape gap)`. The gap is visible; the reason is not.
 
-Same single-series data as `bar`. Height grows with the row count. Use it when labels are long or there are more than about eight categories. Sort the data by value before you pass it, unless the categories have a natural order.
+## Log scales and illustrative curves
 
-Extra option: `labelWidth` (default `140`) for the left margin that holds the category names. The value axis is horizontal, so its title goes in `xLabel`: `{ xLabel: "Build time (s)" }`. `rule` works here too; the line stands vertical.
-
-## `Report.line(selector, series, opts)`
-
-```js
-var d = function (s) { return new Date(s); };
-Report.line("#fig-latency", [
-  { name: "p50", values: [{ x: d("2026-09-08"), y: 41 }, { x: d("2026-09-09"), y: 40 }] },
-  { name: "p99", values: [{ x: d("2026-09-08"), y: 171 }, { x: d("2026-09-09"), y: 174 }] }
-], { format: ",.0f", xFormat: "%b %d", yLabel: "Latency (ms)", xLabel: "Date (UTC)" });
-```
-
-`x` is a `Date` for a time axis or a number for a linear axis. All series share one x and one y scale.
-
-A series may carry `dashed: true`. Use it for a series that is not a measurement: a target, a plan, a model. The legend swatch becomes a dashed bar, so the reader sees which line it is. A dashed series still takes its slot colour.
-
-| Option | Default | Meaning |
-|---|---|---|
-| `format` | `",~f"` | y format for ticks, end labels, tooltip |
-| `yLabel` | none | y-axis title, quantity and unit: `"Throughput (req/s)"`. Required |
-| `xLabel` | none | x-axis title. For time: the resolution and the zone, `"Day (UTC)"`. For a number: quantity and unit, `"Payload size (KiB)"`. Required |
-| `xFormat` | `"%b %d"` time / `"~f"` number | a `d3.timeFormat` or `d3.format` string |
-| `xTicks` | `6` | x tick count |
-| `zero` | `true` | y axis starts at zero. `false` lets it start at the data minimum. Say so in the sub-title |
-| `min`, `max` | data | y domain override |
-| `area` | `false` | a 10% wash under each line |
-| `curve` | `"linear"` | `"smooth"` for a monotone curve |
-| `labels` | `true` | end-of-line value labels, shown for at most four series |
-| `log` | `false` | a log y axis. The runtime appends `(log)` to `yLabel` for you. A value at or below zero drops out and leaves a gap |
-| `points` | auto | `true` / `false`. Auto marks every point when the longest series has at most 12 |
-| `rule` | none | a reference line: `{ value: 200, label: "SLO 200 ms" }`, or an array of them |
-| `height`, `margin`, `ticks` | as `bar` | |
-
-### Reference lines
-
-`rule` draws the line the data is judged against: an SLO, a budget, last quarter, a physical limit. It is not a series. It wears `--axis` with a dash, it takes no slot colour, and it carries its own label at the end of the line. `report.py lint` warns on a `rule` with no `label`.
-
-```js
-Report.line("#fig-latency", series, {
-  yLabel: "Latency (ms)", xLabel: "Day (UTC)",
-  rule: { value: 200, label: "SLO 200 ms" }
-});
-```
-
-### Missing data
-
-A missing point is `{ x: …, y: null }`. Write it; do not drop the row and do not write a zero.
-
-- The line breaks and leaves a gap. It does not join across the hole and it does not fall to zero.
-- The point stays out of the axis domain, so one hole does not move the scale.
-- A bar with no value leaves an empty slot. `hbar` still prints the category name.
-- A figure with no drawable point at all prints `no data` in the plot, in `--ink-3`.
-- **Say it in the sub line.** `n = 7 days, 2 missing (scrape gap)`. The gap is visible, but the reader needs the reason.
-
-## Mark specs the runtime applies
-
-- Bars at most 24px thick, 4px rounded data-end, square at the baseline, a surface gap between neighbours from band padding.
-- Lines 2px with round joins. End dots 8px with a 2px `--surface` ring. A `dashed` series uses a 5-4 dash.
-- Point dots 6px with a 1.5px `--surface` ring, on a sparse series only.
-- Reference lines hairline `--axis`, 5-4 dash, label at the end in `--ink-2`.
-- Gridlines hairline, `--grid`. Baseline `--axis`. No axis domain path.
-- A hover on a legend item holds that series and drops the others to 18% opacity.
-- An empty plot says `no data` in `--ink-3`, centred.
-- Axis titles in `--ink-2`, 12px, centred on the axis. The y title is rotated 90°. Each title adds 18px of margin on its side.
-- Legend above the plot for two or more series. None for one series: the figure title names it.
-- Tooltip on hover: per bar, or a crosshair with every series at that x on a line chart.
-- Text in `--ink-2` / `--ink-3`, never a series colour.
+- A log y axis on a line: `"scale": {"type": "log"}` and say `(log)` in the title, `"Latency (ms, log)"`. A value at or below zero drops out.
+- A log-scale bar chart also needs `"stack": null` and `"scale": {"type": "log", "zero": false}` on y plus `"y2": {"datum": <axis floor>}`; otherwise the bars start at zero and are not drawn.
+- A curve computed from a model (`"data": {"sequence": …}` with `calculate` transforms) must say "Illustrative" in the caption and name the formula. The lint warns otherwise.
 
 ## Figure requirements
 
-A figure must stand on its own. A reader who sees only the figure, with no prose, must be able to name the quantity, its unit, the window, the sample, and the source. Fill every part below; the lint warns on the ones it can see.
+A figure must stand on its own. A reader who sees only the figure, with no prose, must be able to name the quantity, its unit, the window, the sample, and the source.
 
 | Part | Where | Content | Example |
 |---|---|---|---|
-| Number | start of `figcaption` | `Figure N.` in document order. Prose cites the number, never "the chart below" | `Figure 3.` |
-| Message | `.rp-figure__title` | The finding as a sentence, not the variable name | `p99 latency rose 10% after the Thursday deploy` |
-| Quantity, unit, window, n | `.rp-figure__sub` | What is plotted, the unit, the time window with zone, the sample size, and any aggregation | `Latency (ms) per percentile, daily median of hourly samples. 2026-09-07 to 2026-09-13, UTC. n = 168 h.` |
-| Value-axis title | `yLabel` (`xLabel` for `hbar`) | Quantity and unit in parentheses | `Latency (ms)`, `Requests (count)`, `Share (%)` |
-| Category or x-axis title | `xLabel` | What the positions are. For time: resolution and zone | `Day (UTC)`, `Region`, `Payload size (KiB)` |
-| Source and method | `figcaption` after the number | Where the data came from, how it was reduced, and any caveat | `Source: gateway metrics, Prometheus 5 m scrape, median per day.` |
+| Number | start of `figcaption`, in `<strong>` | `Figure N.` in document order. Prose cites the number, never "the chart below" | `<strong>Figure 3.</strong>` |
+| Message | caption, first sentence | The finding as a sentence, not the variable name | `p99 latency rose 10% after the Thursday deploy.` |
+| Window, n, statistic | caption, next | The time window with zone, the sample size, any aggregation | `Daily median of hourly percentiles, 2026-09-07 to 2026-09-13, UTC; n = 7 days.` |
+| Source | caption, last, after `Data:` | Where the data came from, how it was reduced, any caveat | `Data: gateway metrics, Prometheus 5 m scrape.` |
+| Value-axis title | `"title"` on the quantitative encoding | Quantity and unit in parentheses | `"Latency (ms)"`, `"Requests (count)"`, `"Share (%)"` |
+| Category or time-axis title | `"title"` on the other encoding | What the positions are. For time: resolution and zone | `"Day (UTC)"`, `"Region"`, `"Payload size (KiB)"` |
+
+The lint warns on a missing `Figure N.`, numbers out of order, a caption with no `Data:`, a quantitative axis with no title or no unit, and a temporal axis with no title.
 
 ### Units
 
-- **Every value axis has a unit.** Write the quantity, then the unit in parentheses: `Latency (ms)`. A count is a unit too: `Requests (count)`. A ratio is `(%)` or `(ratio)`; say which base.
-- **Use SI units and SI prefixes** where they exist: `ms`, `s`, `MB`, `GiB`, `req/s`. Do not mix `MB` and `MiB` in one report.
-- **Put a scale factor on the axis, not in prose.** Write `Requests (thousands)` and plot `212`, or plot `212000` with `format: ",.0f"`. Never plot scaled numbers under an unscaled title.
+- **Every value axis has a unit.** Quantity, then the unit in parentheses: `Latency (ms)`. A count is a unit too: `Requests (count)`. A ratio is `(%)` or `(ratio)`; say which base.
+- **SI units and prefixes** where they exist: `ms`, `s`, `MB`, `GiB`, `req/s`. Do not mix `MB` and `MiB` in one report.
+- **A scale factor goes on the axis.** Write `Requests (thousands)` and plot `212`, never scaled numbers under an unscaled title. Or plot `212000` with `"axis": {"format": "~s"}`.
 - **One unit per quantity across the report.** If latency is in `ms` in Figure 1, it is in `ms` in every figure and table.
-- **Tick format matches the unit's precision.** Milliseconds as integers, ratios to one decimal, money to the cent only in a table.
-- **Time axes state the zone and the resolution** in `xLabel` or the sub: `Hour (UTC)`, `Day (Europe/Paris)`. Never leave a date axis with an unstated zone.
+- **Time axes state the zone and the resolution:** `Hour (UTC)`, `Day (Europe/Paris)`.
 - **Rates carry both units:** `Throughput (req/s)`, `Cost (USD/day)`.
 
 ### Scales and sample
 
-- **The y axis starts at zero** for bars always and for lines by default. If a line uses `zero: false`, the sub says `y axis starts at <min>`.
-- **State the sample.** `n = 7 days`, `n = 1 240 requests`, `3 runs per point`. If a point is an aggregate, name the statistic: `median`, `mean`, `p99`.
-- **State uncertainty when it exists.** The runtime draws no error bars, so give the spread in the sub or the caption: `mean of 3 runs, range ±4%`, and put per-run values in a table.
-- **No truncated or broken axes and no secondary axis at all.** For a log axis pass `log: true`; the runtime writes `(log)` into the axis title. Never scale the values by hand under a linear title.
+- **The y axis starts at zero** for bars always and for lines by default (Vega-Lite's default). If a line uses `"scale": {"zero": false}`, the caption says where the axis starts.
+- **State the sample.** `n = 7 days`, `n = 1 240 requests`, `3 runs per point`. If a point is an aggregate, name the statistic: median, mean, p99.
+- **State uncertainty when it exists.** Give the spread in the caption (`mean of 3 runs, range ±4%`), or draw it with an `errorband` / `errorbar` layer, and put per-run values in a table.
+- **A figure with more than about twelve values gets a table** nearby or in an appendix.
 
-### Rules for the author
+## A new form or a theme change
 
-- **One figure, one message.** Put the message in `.rp-figure__title`, units and window in `.rp-figure__sub`, the source in `figcaption`.
-- **Data lives in the file.** Write it as JavaScript literals in the data script at the end of the body. No fetches, no external JSON.
-- **Series order is meaning.** The first series is the one the story is about. Keep the same series in the same slot across every figure in the report.
-- **Numbers in a table too.** A figure with more than about twelve values gets a table nearby or in an appendix; the runtime does not build one.
-- **Status colours stay out of series.** A "failed" series is still a series slot; a status dot beside the label carries the state.
-
-## A new form
-
-Extend the runtime in `templates/report.html`, not the report. Reuse `frame`, `yGrid`, `legend`, `tooltip`, `observe`, and `SERIES`. Colour every mark with `SERIES[i]` or a `var(--token)`. Then update this file and the lint if the new form needs a new check. A raw D3 snippet inside a report with its own hex colours fails `report.py lint`.
+Change the template in this skill, not the report: `chartConfig()` in `#sf-runtime` holds the theme. Keep it in step with the theory reading page, which shares it. Then update this file and the lint if the change needs a new check.

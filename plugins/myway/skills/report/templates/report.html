@@ -1,937 +1,1068 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{TITLE}}</title>
 <meta name="author" content="{{AUTHOR}}">
 <meta name="date" content="{{DATE}}">
-<script>
-  // Theme bootstrap. Runs before first paint so the page never flashes.
-  // Order: stored choice > OS preference > light.
-  (function () {
-    var stored = null;
-    try { stored = localStorage.getItem("rp-theme"); } catch (e) {}
-    var os = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    document.documentElement.setAttribute("data-theme", stored === "dark" || stored === "light" ? stored : os);
-  })();
-</script>
-<style>
-/* ============================================================
-   HOUSE STYLE — tokens. This block is the only place a colour
-   literal may appear. Everything below refers to a token.
-   Light and dark are both selected values, not an auto flip.
-   ============================================================ */
+<!-- Layout and styling adapted from https://numbers.sfinterface.com, by way of the ~/Research/theory reading page -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
+<style id="sf-style">
+/* House style. This block is the only place a colour literal may appear, and a report never edits it:
+   `report.py lint` fails when it differs from the template. */
 :root {
-  color-scheme: light;
-  /* planes */
-  --plane:        #f9f9f7;   /* page background */
-  --surface:      #fcfcfb;   /* cards, chart surface, top bar, outline */
-  --border:       rgba(11, 11, 11, 0.10);
-  /* ink */
-  --ink-1:        #0b0b0b;   /* primary text */
-  --ink-2:        #52514e;   /* secondary text */
-  --ink-3:        #898781;   /* muted: axis labels, captions */
-  --grid:         #e1e0d9;   /* hairline gridlines */
-  --axis:         #c3c2b7;   /* baseline */
-  --delta-up:     #006300;   /* success text */
-  /* categorical series, fixed order — never cycle, never re-sort */
-  --series-1:     #2a78d6;   /* blue */
-  --series-2:     #eb6834;   /* orange */
-  --series-3:     #1baf7a;   /* aqua */
-  --series-4:     #eda100;   /* yellow */
-  --series-5:     #e87ba4;   /* magenta */
-  --series-6:     #008300;   /* green */
-  --series-7:     #4a3aa7;   /* violet */
-  --series-8:     #e34948;   /* red */
-  --accent:       var(--series-1);
-  /* sequential (one hue, light -> dark) */
-  --seq-1:        #cde2fb;
-  --seq-2:        #9ec5f4;
-  --seq-3:        #6da7ec;
-  --seq-4:        #3987e5;
-  --seq-5:        #256abf;
-  --seq-6:        #184f95;
-  --seq-7:        #0d366b;
-  /* diverging midpoint */
-  --div-mid:      #f0efec;
-  /* status — reserved, never used as a series colour */
-  --good:         #0ca30c;
-  --warning:      #fab219;
-  --serious:      #ec835a;
-  --critical:     #d03b3b;
-  /* type & rhythm */
-  --font:         system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono:         ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --measure:      72rem;
-  --radius:       6px;
-  --nav-h:        3.25rem;
-  --outline-w:    15rem;     /* left outline column */
-  --gutter:       2.5rem;    /* outline to content */
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --plane:        #0d0d0d;
-  --surface:      #1a1a19;
-  --border:       rgba(255, 255, 255, 0.10);
-  --ink-1:        #ffffff;
-  --ink-2:        #c3c2b7;
-  --ink-3:        #898781;
-  --grid:         #2c2c2a;
-  --axis:         #383835;
-  --delta-up:     #0ca30c;
-  --series-1:     #3987e5;
-  --series-2:     #d95926;
-  --series-3:     #199e70;
-  --series-4:     #c98500;
-  --series-5:     #d55181;
-  --series-6:     #008300;
-  --series-7:     #9085e9;
-  --series-8:     #e66767;
-  --seq-1:        #0d366b;
-  --seq-2:        #184f95;
-  --seq-3:        #256abf;
-  --seq-4:        #3987e5;
-  --seq-5:        #6da7ec;
-  --seq-6:        #9ec5f4;
-  --seq-7:        #cde2fb;
-  --div-mid:      #383835;
+  --site-bg: #fdfdfc;
+  --site-fg: #1c1c21;
+  --site-prose: #2f2f2d;
+  --site-muted: #6f6f6c;
+  --site-subtle: #9a9a96;
+  --site-line: rgba(17, 17, 17, 0.09);
+  --site-surface: #ffffff;
+  --site-hover: rgba(17, 17, 17, 0.045);
+  --site-pill: rgba(17, 17, 17, 0.05);
+  --site-topbar-h: 72px;
+  --site-content: 644px;
+  --site-contents-w: 186px;
+  --site-contents-gap: 44px;
+  --site-gutter: 24px;
+  --site-font: "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --site-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --site-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Times New Roman", serif;
+  --site-radius-full: 999px;
+  --site-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --site-ring: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 2px rgba(0, 0, 0, 0.04);
+  --sfi-tap: 90ms;
+  --sfi-quick: 140ms;
+  --sfi-settle: 240ms;
+  --sfi-glide: 360ms;
+  --sfi-halo: color-mix(in srgb, #036ee6 20%, transparent);
+  /* Component tones (data-tone="accent|positive|caution|negative"); neutral is the default */
+  --sf-tone-neutral: #6f6f6c;
+  --sf-tone-accent: #036ee6;
+  --sf-tone-positive: #1a7f4b;
+  --sf-tone-caution: #a86400;
+  --sf-tone-negative: #c4321c;
+  /* Chart series, in fixed order (validated categorical palette from the dataviz skill) */
+  --sf-series: #2a78d6, #eb6834, #1baf7a, #eda100, #e87ba4, #008300, #4a3aa7, #e34948;
 }
 
-/* ---------- base ---------- */
-*, *::before, *::after { box-sizing: border-box; }
-[hidden] { display: none !important; }
-html { scroll-padding-top: calc(var(--nav-h) + 1rem); }
-/* The top bar is sticky, so it is always in view. Without this, focus on a
-   top-bar control reads as "under the padding" and the page jumps. */
-.rp-nav, .rp-nav * { scroll-margin-top: calc(-1 * (var(--nav-h) + 1rem)); }
-@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+html { -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; }
 body {
   margin: 0;
-  background: var(--plane);
-  color: var(--ink-1);
-  font: 16px/1.55 var(--font);
+  background: var(--site-bg);
+  color: var(--site-fg);
+  font-family: var(--site-font);
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: -0.011em;
+  font-feature-settings: "cv01", "ss03";
   -webkit-font-smoothing: antialiased;
 }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-h1, h2, h3 { line-height: 1.2; margin: 0 0 .5em; font-weight: 650; letter-spacing: -0.01em; }
-h1 { font-size: 2rem; }
-h2 { font-size: 1.4rem; margin-top: 0; }
-h3 { font-size: 1.1rem; margin-top: 1.5rem; }
-h4 { font-size: 1rem; margin: 1.25rem 0 .4rem; font-weight: 600; line-height: 1.3; }
-p, ul, ol { margin: 0 0 1em; }
-code, pre { font-family: var(--mono); font-size: .9em; }
-pre {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: .75rem 1rem; overflow-x: auto;
-}
-hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
-small, .rp-muted { color: var(--ink-3); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:is(a, button):focus-visible { outline: none; box-shadow: 0 0 0 3px var(--sfi-halo); }
 
-/* ---------- top bar: title and theme toggle ---------- */
-.rp-nav {
-  position: sticky; top: 0; z-index: 10;
-  height: var(--nav-h);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+/* Top bar */
+.sf-topbar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 24px;
+  height: var(--site-topbar-h);
+  padding-inline: max(var(--site-gutter), calc(50% - var(--site-content) / 2 - var(--site-contents-gap) - var(--site-contents-w)));
 }
-.rp-nav__inner {
-  max-width: calc(var(--measure) + var(--outline-w) + var(--gutter) + 2.5rem); margin: 0 auto; height: 100%;
-  padding: 0 1.25rem;
-  display: flex; align-items: center; gap: 1rem;
+.sf-topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  backdrop-filter: blur(14px) saturate(1.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  mask-image: linear-gradient(180deg, #000 62%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent);
+  transition: background-color var(--sfi-settle) var(--site-ease);
 }
-.rp-nav__brand {
-  font-weight: 650; color: var(--ink-1); margin-right: auto; min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.sf-topbar[data-scrolled]::before {
+  background-color: color-mix(in srgb, var(--site-bg) 72%, transparent);
+  mask-image: linear-gradient(180deg, #000 84%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, #000 84%, transparent);
 }
-.rp-nav__brand:hover { text-decoration: none; }
-.rp-toggle, .rp-outline-toggle {
-  appearance: none; border: 1px solid var(--border); background: transparent;
-  color: var(--ink-2); border-radius: 999px; padding: .3rem .7rem;
-  font: inherit; font-size: .85rem; cursor: pointer; flex: none;
-  display: inline-flex; align-items: center; gap: .4rem;
+.sf-topbar-back {
+  grid-column: 1;
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--site-muted);
+  font-family: var(--site-mono);
+  font-size: 12.5px;
+  letter-spacing: 0;
+  padding: 6px 11px;
+  margin-left: -11px;
+  border-radius: var(--site-radius-full);
+  transition: color var(--sfi-quick) var(--site-ease), background var(--sfi-quick) var(--site-ease);
 }
-.rp-toggle:hover, .rp-outline-toggle:hover { color: var(--ink-1); border-color: var(--ink-3); }
-.rp-toggle__icon { width: 1em; height: 1em; }
-:root[data-theme="light"] .rp-toggle__label-dark, :root[data-theme="dark"] .rp-toggle__label-light { display: none; }
-.rp-outline-toggle { display: none; }
+.sf-topbar-back:hover { color: var(--site-fg); background: var(--site-pill); }
+.sf-contents-toggle { display: none; }
+.sf-brand {
+  grid-column: 2;
+  justify-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  text-align: center;
+  color: #000;
+}
+.sf-brand-place, .sf-brand-name { font-family: var(--site-display); }
+.sf-brand-place { font-style: italic; font-size: 17px; letter-spacing: 0.006em; color: var(--site-muted); }
+.sf-brand-name {
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.1175em;
+  text-indent: 0.1175em;
+  -webkit-text-stroke: 0.016em currentColor;
+}
+.sf-topbar-end { grid-column: 3; justify-self: end; display: flex; align-items: center; gap: 2px; }
+.sf-topbar-note { height: 28px; display: inline-flex; align-items: center; padding: 0 10px; font-size: 13px; color: var(--site-muted); }
 
-/* ---------- outline: floating, left, built from the headings ---------- */
-.rp-outline {
-  position: sticky; top: calc(var(--nav-h) + 1.5rem); align-self: start;
-  margin-top: 2.5rem;
-  max-height: calc(100vh - var(--nav-h) - 3rem);
-  overflow-y: auto; scrollbar-width: thin;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 16px rgba(0, 0, 0, .05);
-  padding: .75rem .5rem;
-  font-size: .875rem; line-height: 1.35;
+/* Right: outline, built from the h2 and h3 headings */
+.sf-rail {
+  position: fixed;
+  top: calc(var(--site-topbar-h) + 56px);
+  z-index: 20;
+  max-height: calc(100vh - var(--site-topbar-h) - 56px - 40px);
+  padding-block: 4px;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-.rp-outline__title { color: var(--ink-2); font-size: .8rem; font-weight: 600; margin: 0 .5rem .4rem; }
-.rp-outline ol { list-style: none; margin: 0; padding: 0; }
-.rp-outline ol ol { margin: .1rem 0 .25rem .75rem; padding-left: .25rem; border-left: 1px solid var(--grid); }
-.rp-outline a {
-  display: block; padding: .28rem .5rem; border-radius: 4px;
-  color: var(--ink-2); overflow-wrap: anywhere;
+.sf-rail::-webkit-scrollbar { display: none; }
+.sf-rail-label {
+  margin: 0 0 5px;
+  padding-inline: 11px;
+  color: var(--site-fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
 }
-.rp-outline > ol > li > a { color: var(--ink-1); font-weight: 500; }
-.rp-outline ol ol a { font-size: .84rem; }
-.rp-outline ol ol ol a { font-size: .8rem; }
-.rp-outline a:hover { color: var(--ink-1); background: var(--plane); text-decoration: none; }
-.rp-outline a.is-active {
-  color: var(--ink-1); background: var(--plane);
-  box-shadow: inset 2px 0 0 var(--accent);
+.sf-contents { left: calc(50% + var(--site-content) / 2 + var(--site-contents-gap)); width: var(--site-contents-w); }
+.sf-contents[hidden] { display: none; }
+.sf-contents-list { position: relative; display: flex; flex-direction: column; gap: 1px; }
+.sf-contents-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  border-radius: var(--site-radius-full);
+  background: var(--site-pill);
+  pointer-events: none;
+  opacity: 0;
 }
-/* data-expand="active": show a branch only while the reader is inside it */
-.rp-outline[data-expand="active"] li:not(.is-open) > ol { display: none; }
+.sf-contents-pill[data-travel] {
+  opacity: 1;
+  transition: transform var(--sfi-glide) var(--site-ease), height var(--sfi-glide) var(--site-ease), opacity var(--sfi-quick) var(--site-ease);
+}
+.sf-contents-link {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 4px 11px;
+  border-radius: var(--site-radius-full);
+  color: var(--site-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  transition: color var(--sfi-quick) var(--site-ease), transform var(--sfi-settle) var(--site-ease);
+}
+.sf-contents-link.is-sub { font-size: 12.5px; }
+.sf-contents-numeral {
+  flex: none;
+  width: 26px;
+  color: var(--site-subtle);
+  font-family: var(--site-display);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+  text-align: right;
+}
+.sf-contents-numeral:not(:empty)::after { content: "."; }
+.sf-contents-link.is-sub .sf-contents-numeral { width: 36px; }
+.sf-contents-name { overflow: hidden; text-overflow: ellipsis; }
+.sf-contents-link:hover, .sf-contents-link[data-active] { color: var(--site-fg); }
+.sf-contents-link[data-active] .sf-contents-numeral { color: var(--site-muted); }
+.sf-contents-link:active { transform: scale(0.97); transition: transform var(--sfi-tap) var(--site-ease); }
 
-/* ---------- layout ---------- */
-.rp-layout {
-  max-width: calc(var(--measure) + var(--outline-w) + var(--gutter) + 2.5rem); margin: 0 auto;
-  padding: 0 1.25rem;
-  display: grid; grid-template-columns: var(--outline-w) minmax(0, 1fr); gap: var(--gutter);
+/* Article */
+.sf-shell { min-height: 100vh; padding: calc(var(--site-topbar-h) + 56px) var(--site-gutter) 0; }
+.sf-article { width: 100%; max-width: var(--site-content); margin-inline: auto; }
+.sf-article [id] { scroll-margin-top: calc(var(--site-topbar-h) + 40px); }
+.sf-doc-header { margin-bottom: 38px; }
+.sf-doc-group { margin: 0 0 20px; color: var(--site-subtle); font-size: 13px; line-height: 1.4; }
+.sf-doc-title {
+  margin: 0 0 12px;
+  font-family: var(--site-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.08;
+  -webkit-text-stroke: 0.4px currentColor;
 }
-.rp-layout > .rp-main { grid-column: 2; }
-/* No headings: no outline, and the top bar and content narrow to the measure. */
-.rp-no-outline .rp-layout, .rp-no-outline .rp-nav__inner { max-width: calc(var(--measure) + 2.5rem); }
-.rp-no-outline .rp-layout { grid-template-columns: minmax(0, 1fr); }
-.rp-no-outline .rp-layout > .rp-main { grid-column: 1; }
-.rp-main { max-width: var(--measure); min-width: 0; padding: 2.5rem 0 4rem; }
-@media (max-width: 63.99rem) {
-  .rp-layout { display: block; }
-  .rp-outline-toggle { display: inline-flex; }
-  .rp-outline {
-    position: fixed; z-index: 20; top: var(--nav-h); bottom: 0; left: 0;
-    align-self: normal;   /* a fixed box honours align-self; start would stop it short of the bottom */
-    width: min(20rem, 85vw); max-height: none; margin: 0;
-    overscroll-behavior: contain;   /* the drawer covers the page: do not scroll it */
-    border-width: 0 1px 0 0; border-radius: 0;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
-    transform: translateX(-100%); visibility: hidden;
+.sf-doc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--site-fg);
+}
+.sf-doc-path { font-family: var(--site-mono); font-size: 12px; font-weight: 400; color: var(--site-muted); }
+.sf-doc-kind { font-style: italic; }
+.sf-doc-senses { color: var(--site-muted); font-weight: 400; }
+
+.sf-body { color: var(--site-prose); }
+.sf-body > :first-child { margin-top: 0; }
+.sf-body :is(p, ul, ol, blockquote) { max-width: 62ch; }
+.sf-body p { margin: 0 0 18px; }
+.sf-body :is(ul, ol) { margin: 0 0 18px; padding-left: 20px; }
+.sf-body li { margin: 5px 0; }
+.sf-body li > p { margin: 0 0 6px; }
+.sf-body li::marker { color: var(--site-subtle); }
+.sf-body strong { color: var(--site-fg); font-weight: 540; }
+.sf-body em { font-style: italic; }
+.sf-body a:not(.footnote-backref, .footnote-ref > a) {
+  color: var(--site-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(17, 17, 17, 0.22);
+  transition: text-decoration-color var(--sfi-quick) var(--site-ease);
+}
+.sf-body a:not(.footnote-backref, .footnote-ref > a):hover { text-decoration-color: currentColor; }
+.sf-body h2 { margin: 56px 0 20px; color: var(--site-fg); font-size: 17px; font-weight: 540; letter-spacing: -0.016em; line-height: 1.4; }
+.sf-body h3 { margin: 32px 0 12px; color: var(--site-fg); font-size: 14.5px; font-weight: 540; letter-spacing: -0.012em; }
+.sf-body h4 { margin: 24px 0 8px; color: var(--site-subtle); font-size: 11px; font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; }
+.sf-section-numeral {
+  margin-right: 0.46em;
+  color: var(--site-subtle);
+  font-family: var(--site-display);
+  font-size: 0.76em;
+  font-weight: 400;
+  letter-spacing: 0.015em;
+}
+.sf-section-numeral::after { content: "."; }
+.sf-body code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(17, 17, 17, 0.045);
+  font-family: var(--site-mono);
+  font-size: 0.86em;
+  letter-spacing: 0;
+}
+.sf-code { margin: 18px 0 22px; }
+.sf-code pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--site-surface);
+  box-shadow: var(--site-ring);
+  color: var(--site-fg);
+  font-family: var(--site-mono);
+  font-size: 13px;
+  line-height: 1.68;
+  letter-spacing: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.sf-code pre code { padding: 0; background: none; font-size: inherit; }
+.sf-body blockquote { margin: 0 0 18px; padding: 2px 0 2px 14px; border-left: 2px solid var(--site-line); color: var(--site-muted); }
+.sf-body blockquote > :last-child { margin-bottom: 0; }
+.sf-body hr { height: 1px; margin: 40px 0; border: 0; background: var(--site-line); }
+.sf-body img { max-width: 100%; border-radius: 12px; }
+.sf-table-wrap { margin: 4px 0 22px; overflow-x: auto; }
+.sf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sf-table th {
+  padding: 0 14px 9px 0;
+  color: var(--site-subtle);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-align: left;
+  text-transform: uppercase;
+  vertical-align: bottom;
+}
+.sf-table td {
+  padding: 11px 14px 11px 0;
+  color: var(--site-muted);
+  vertical-align: top;
+  background: linear-gradient(var(--site-line), var(--site-line)) no-repeat 0 100% / 100% 1px;
+}
+.sf-table td:first-child { color: var(--site-fg); }
+.sf-table :is(th, td).num { text-align: right; font-variant-numeric: tabular-nums; }
+.sf-table :is(th, td):last-child { padding-right: 0; }
+
+/* Footnote citations */
+.sf-body .footnote-ref { font-size: 10px; line-height: 0; }
+.sf-body .footnote-ref > a {
+  margin-left: 2px;
+  padding: 1px 4px;
+  border-radius: var(--site-radius-full);
+  background: var(--site-pill);
+  color: var(--site-muted);
+  font-family: var(--site-mono);
+  transition: color var(--sfi-quick) var(--site-ease), background-color var(--sfi-quick) var(--site-ease);
+}
+.sf-body .footnote-ref > a:hover { color: var(--site-fg); background: rgba(17, 17, 17, 0.09); }
+.sf-body .footnotes { margin-top: 56px; font-size: 12.5px; }
+.sf-body .footnotes::before {
+  content: "Sources";
+  display: block;
+  margin-bottom: 14px;
+  color: var(--site-fg);
+  font-size: 17px;
+  font-weight: 540;
+  letter-spacing: -0.016em;
+}
+.sf-body .footnotes-list { max-width: none; padding-left: 24px; }
+.sf-body .footnote-item { margin: 6px 0; color: var(--site-muted); }
+.sf-body .footnote-item::marker { font-family: var(--site-mono); font-size: 10.5px; }
+.sf-body .footnote-item p { max-width: none; margin: 0; overflow-wrap: anywhere; }
+.sf-body .footnote-item a { text-decoration: none; }
+.sf-body .footnote-backref { margin-left: 4px; color: var(--site-subtle); }
+.sf-body :target { animation: sf-flash 1.4s var(--site-ease); }
+@keyframes sf-flash { from { background: var(--sfi-halo); } }
+
+/* Components: the vocabulary of a report body, specified in references/components.md.
+   Every component takes an optional data-tone; --tone is the resolved color. */
+.sf-body [data-tone] { --tone: var(--sf-tone-neutral); }
+.sf-body [data-tone="accent"] { --tone: var(--sf-tone-accent); }
+.sf-body [data-tone="positive"] { --tone: var(--sf-tone-positive); }
+.sf-body [data-tone="caution"] { --tone: var(--sf-tone-caution); }
+.sf-body [data-tone="negative"] { --tone: var(--sf-tone-negative); }
+.sf-body .sf-label {
+  margin: 0 0 6px;
+  color: var(--tone, var(--site-subtle));
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sf-body .sf-lede { max-width: 60ch; margin: 0 0 28px; color: var(--site-fg); font-size: 16px; line-height: 1.6; letter-spacing: -0.014em; }
+
+/* Stat row */
+.sf-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px;
+  margin: 0 0 32px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--site-line);
+  box-shadow: var(--site-ring);
+}
+.sf-body .sf-stat { max-width: none; margin: 0; padding: 14px 16px 13px; background: var(--site-surface); }
+.sf-stat-value { display: block; color: var(--site-fg); font-family: var(--site-display); font-size: 24px; line-height: 1.15; -webkit-text-stroke: 0.3px currentColor; }
+.sf-stat-label { display: block; margin-top: 5px; color: var(--site-muted); font-size: 12px; line-height: 1.35; }
+.sf-stat-delta { display: block; margin-top: 3px; color: var(--tone, var(--site-subtle)); font-size: 11.5px; line-height: 1.35; }
+
+/* Callout */
+.sf-callout {
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tone, var(--sf-tone-neutral)) 5%, var(--site-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone, var(--sf-tone-neutral)) 16%, transparent);
+}
+.sf-body .sf-callout > :last-child { margin-bottom: 0; }
+.sf-body .sf-callout p { max-width: none; }
+
+/* Badge and tags */
+.sf-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--site-radius-full);
+  background: color-mix(in srgb, var(--tone, var(--sf-tone-neutral)) 10%, transparent);
+  color: var(--tone, var(--sf-tone-neutral));
+  font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.sf-body .sf-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0; padding: 0; list-style: none; }
+.sf-body .sf-tags li { margin: 0; padding: 1px 7px; border-radius: var(--site-radius-full); background: var(--site-pill); color: var(--site-muted); font-size: 11px; }
+
+/* Timeline */
+.sf-body .sf-timeline { max-width: none; margin: 0 0 26px; padding: 0; list-style: none; }
+.sf-body .sf-timeline > li { position: relative; display: grid; grid-template-columns: 76px 1fr; margin: 0; padding: 0 0 20px; }
+.sf-timeline > li::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 61px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--site-bg);
+  box-shadow: 0 0 0 1.5px var(--tone, var(--site-subtle));
+}
+.sf-timeline > li[data-tone]::before { background: var(--tone); }
+.sf-timeline > li::after { content: ""; position: absolute; top: 18px; bottom: 0; left: 64px; width: 1px; background: var(--site-line); }
+.sf-timeline > li:last-child { padding-bottom: 0; }
+.sf-timeline > li:last-child::after { display: none; }
+.sf-timeline time { padding-top: 1px; color: var(--site-fg); font-family: var(--site-display); font-size: 15px; line-height: 1.3; }
+.sf-body .sf-timeline > li > div > p { max-width: none; margin: 0 0 4px; }
+.sf-body .sf-timeline > li > div > :last-child { margin-bottom: 0; }
+
+/* Cards: paper cards and generic cards */
+.sf-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; margin: 0 0 26px; }
+.sf-card, .sf-paper { padding: 14px 16px 15px; border-radius: 12px; background: var(--site-surface); box-shadow: var(--site-ring); }
+.sf-body :is(.sf-card, .sf-paper) p { max-width: none; margin: 0 0 6px; font-size: 13px; }
+.sf-body :is(.sf-card, .sf-paper) > :last-child { margin-bottom: 0; }
+.sf-body .sf-paper-meta { display: flex; gap: 8px; color: var(--site-subtle); font-size: 12px; }
+.sf-paper-meta > :first-child { color: var(--site-fg); font-family: var(--site-display); font-size: 13.5px; }
+.sf-paper-meta > :nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-body .sf-paper-title, .sf-body .sf-card-title { color: var(--site-fg); font-size: 14px; font-weight: 540; line-height: 1.4; }
+.sf-body .sf-paper-title a { text-decoration: none; }
+.sf-body .sf-paper-title a:hover { text-decoration: underline; }
+.sf-body .sf-paper-venue { color: var(--site-muted); font-style: italic; }
+
+/* Equations (KaTeX renders \[ ... \] and \( ... \)) */
+.sf-equation { position: relative; margin: 6px 0 24px; padding: 4px 44px 2px 0; }
+.sf-equation[data-label]::after { content: "(" attr(data-label) ")"; position: absolute; top: 50%; right: 0; transform: translateY(-50%); color: var(--site-subtle); font-size: 12.5px; }
+.sf-equation:has(figcaption)[data-label]::after { top: 22px; }
+.sf-equation .katex-display { margin: 0.6em 0; }
+.sf-equation figcaption { max-width: 62ch; color: var(--site-muted); font-size: 12.5px; }
+.sf-body .katex { font-size: 1.08em; }
+
+/* Figures and charts */
+.sf-figure { margin: 8px 0 28px; }
+.sf-figure figcaption { max-width: 62ch; margin-top: 10px; color: var(--site-muted); font-size: 12.5px; }
+.sf-figure figcaption strong { color: var(--site-fg); font-weight: 540; }
+.sf-chart { min-height: 120px; padding: 16px 16px 10px; border-radius: 12px; background: var(--site-surface); box-shadow: var(--site-ring); }
+.sf-chart > script { display: none; }
+.sf-chart .vega-embed { width: 100%; }
+.sf-chart-error { color: var(--sf-tone-negative); font-family: var(--site-mono); font-size: 12px; }
+
+/* Key/value facts */
+.sf-body .sf-facts { display: grid; grid-template-columns: 104px 1fr; gap: 5px 14px; margin: 10px 0 0; font-size: 13px; }
+.sf-body > .sf-facts { margin: 0 0 22px; }
+.sf-facts dt { color: var(--site-subtle); }
+.sf-facts dd { margin: 0; color: var(--site-prose); }
+
+/* Meter: data-value 0-5 */
+.sf-meter { position: relative; display: inline-block; width: 44px; height: 4px; overflow: hidden; border-radius: 2px; background: var(--site-pill); vertical-align: 2px; }
+.sf-meter::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 2px; background: var(--tone, var(--site-fg)); }
+.sf-meter[data-value="1"]::before { width: 20%; }
+.sf-meter[data-value="2"]::before { width: 40%; }
+.sf-meter[data-value="3"]::before { width: 60%; }
+.sf-meter[data-value="4"]::before { width: 80%; }
+.sf-meter[data-value="5"]::before { width: 100%; }
+
+/* Questions, hypotheses, decisions: numbered blocks */
+.sf-body .sf-questions { max-width: none; margin: 0 0 26px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.sf-body .sf-question, .sf-hypothesis, .sf-decision {
+  margin: 0 0 12px;
+  padding: 14px 16px 15px;
+  border-radius: 12px;
+  background: var(--site-surface);
+  box-shadow: var(--site-ring);
+}
+.sf-body .sf-questions .sf-question { margin: 0; }
+.sf-body :is(.sf-question, .sf-hypothesis, .sf-decision) p { max-width: none; margin: 0 0 6px; font-size: 13px; }
+.sf-body :is(.sf-question, .sf-hypothesis, .sf-decision) > :last-child { margin-bottom: 0; }
+.sf-body .sf-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; color: var(--site-fg); font-size: 14px; font-weight: 540; line-height: 1.45; }
+.sf-head > .sf-badge { margin-left: auto; }
+.sf-id { flex: none; min-width: 22px; color: var(--site-subtle); font-family: var(--site-display); font-size: 13px; font-weight: 400; }
+.sf-hypothesis { box-shadow: inset 2px 0 0 var(--sf-tone-accent), var(--site-ring); }
+.sf-decision { box-shadow: inset 2px 0 0 var(--sf-tone-caution), var(--site-ring); }
+.sf-body .sf-options { max-width: none; margin: 8px 0 0; padding: 0; list-style: none; }
+.sf-body .sf-options li { margin: 0; padding: 7px 0 7px 18px; position: relative; font-size: 13px; background: linear-gradient(var(--site-line), var(--site-line)) no-repeat 0 0 / 100% 1px; }
+.sf-options li::before { content: ""; position: absolute; top: 14px; left: 2px; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--site-subtle); }
+.sf-options li[data-recommended]::before { background: var(--sf-tone-positive); box-shadow: none; }
+/* A decision already taken: the option that was chosen */
+.sf-body .sf-options li[data-chosen] { color: var(--site-fg); background-color: color-mix(in srgb, var(--sf-tone-accent) 6%, transparent); border-radius: 6px; }
+.sf-options li[data-chosen]::before { background: var(--sf-tone-accent); box-shadow: 0 0 0 3px var(--sfi-halo); }
+.sf-options li[data-recommended]::after {
+  content: "Recommended";
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: var(--site-radius-full);
+  background: color-mix(in srgb, var(--sf-tone-positive) 10%, transparent);
+  color: var(--sf-tone-positive);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Steps: a plan; data-state="done|current|next|skip" */
+.sf-body .sf-steps { max-width: none; margin: 0 0 26px; padding: 0; list-style: none; counter-reset: sf-step; }
+.sf-body .sf-steps > li { position: relative; margin: 0; padding: 0 0 18px 38px; counter-increment: sf-step; }
+.sf-steps > li::before {
+  content: counter(sf-step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--site-surface);
+  box-shadow: inset 0 0 0 1px var(--site-line);
+  color: var(--site-muted);
+  font-family: var(--site-display);
+  font-size: 12px;
+}
+.sf-steps > li::after { content: ""; position: absolute; top: 26px; bottom: 4px; left: 11px; width: 1px; background: var(--site-line); }
+.sf-steps > li:last-child { padding-bottom: 0; }
+.sf-steps > li:last-child::after { display: none; }
+.sf-steps > li[data-state="done"]::before { content: "✓"; background: var(--site-fg); box-shadow: none; color: var(--site-bg); font-family: var(--site-font); }
+.sf-steps > li[data-state="current"]::before { background: var(--sf-tone-accent); box-shadow: 0 0 0 4px var(--sfi-halo); color: #fff; }
+.sf-steps > li[data-state="skip"] { opacity: 0.5; }
+.sf-body .sf-steps > li > p { max-width: none; margin: 0 0 4px; }
+.sf-body .sf-steps > li > :last-child { margin-bottom: 0; }
+.sf-body .sf-step-title { padding-top: 1px; color: var(--site-fg); font-weight: 540; }
+
+/* Quotation: verbatim words from a source, with where they appear */
+.sf-body .sf-quote { margin: 0 0 14px; }
+.sf-body .sf-quote p { margin: 0; color: var(--site-prose); }
+.sf-quote cite { display: block; margin-top: 3px; color: var(--site-subtle); font-size: 12px; font-style: normal; }
+
+/* Footer */
+.sf-footer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  max-width: 780px;
+  margin-inline: auto;
+  padding: 160px var(--site-gutter) 56px;
+  text-align: center;
+}
+.sf-footer-plate {
+  margin: 0;
+  color: var(--site-muted);
+  font-family: var(--site-mono);
+  font-size: 12px;
+  line-height: 1.95;
+  letter-spacing: 0.11em;
+  text-indent: 0.11em;
+  text-transform: uppercase;
+}
+.sf-footer-about { color: var(--site-subtle); }
+.sf-footer-pipe { color: var(--site-subtle); opacity: 0.55; }
+.sf-scrim { display: none; }
+
+/* No room for the outline: it becomes a drawer behind the "Contents" button */
+@media (max-width: 1179px) {
+  .sf-topbar { padding-inline: var(--site-gutter); }
+  .sf-topbar-back:not(.sf-contents-toggle) { display: none; }
+  .sf-contents-toggle { display: inline-flex; align-items: center; gap: 7px; font-family: var(--site-font); font-size: 13px; }
+  .sf-contents {
+    top: var(--site-topbar-h);
+    bottom: 0;
+    left: 0;
+    z-index: 35;
+    width: min(300px, 85vw);
+    max-height: none;
+    padding: 16px var(--site-gutter);
+    box-sizing: border-box;
+    background: var(--site-bg);
+    box-shadow: var(--site-ring);
+    overscroll-behavior: contain;
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition: transform var(--sfi-settle) var(--site-ease), visibility 0s linear var(--sfi-settle);
   }
-  .rp-outline.is-open { transform: none; visibility: visible; }
+  body[data-contents-open] .sf-contents { transform: none; visibility: visible; transition: transform var(--sfi-settle) var(--site-ease), visibility 0s; }
+  body[data-contents-open] .sf-scrim { display: block; position: fixed; inset: 0; z-index: 30; background: rgba(17, 17, 17, 0.12); }
 }
-@media (max-width: 63.99rem) and (prefers-reduced-motion: no-preference) {
-  /* Open: visible at once, so focus can move in. Close: hide after the slide. */
-  .rp-outline { transition: transform .2s ease, visibility 0s linear .2s; }
-  .rp-outline.is-open { transition: transform .2s ease, visibility 0s; }
-}
-.rp-header { margin-bottom: 2.5rem; }
-.rp-header__sub { font-size: 1.15rem; color: var(--ink-2); margin: 0 0 .75rem; }
-.rp-header__meta { color: var(--ink-3); font-size: .9rem; display: flex; gap: 1.25rem; flex-wrap: wrap; }
-.rp-section { margin-bottom: 3rem; }
-.rp-section > h2 { padding-top: .25rem; }
-.rp-footer { border-top: 1px solid var(--border); padding-top: 1rem; color: var(--ink-3); font-size: .85rem; }
-
-/* ---------- components ---------- */
-.rp-card {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-}
-.rp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.rp-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
-.rp-tile__label { color: var(--ink-2); font-size: .85rem; }
-.rp-tile__value { font-size: 1.9rem; font-weight: 600; line-height: 1.15; margin: .2rem 0; }
-.rp-tile__delta { font-size: .85rem; color: var(--ink-2); }
-.rp-tile__delta.is-up { color: var(--delta-up); }
-.rp-tile__delta.is-down { color: var(--critical); }
-.rp-hero { font-size: 3.25rem; font-weight: 600; line-height: 1.05; margin: .25rem 0 .5rem; }
-
-.rp-figure { margin: 0 0 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; position: relative; }
-.rp-figure__title { font-weight: 600; margin: 0 0 .15rem; }
-.rp-figure__sub { color: var(--ink-2); font-size: .9rem; margin: 0 0 .75rem; }
-.rp-figure figcaption { color: var(--ink-3); font-size: .85rem; margin-top: .5rem; }
-.rp-figure svg { display: block; width: 100%; height: auto; overflow: visible; }
-.rp-legend { display: flex; flex-wrap: wrap; gap: .5rem 1rem; margin: 0 0 .5rem; padding: 0; list-style: none; font-size: .85rem; color: var(--ink-2); }
-.rp-legend li { display: inline-flex; align-items: center; gap: .4rem; }
-.rp-legend .rp-swatch { width: .75rem; height: .75rem; border-radius: 2px; display: inline-block; }
-.rp-grid line { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
-.rp-grid path, .rp-x path { display: none; }
-.rp-x line { stroke: var(--axis); }
-.rp-axis text, .rp-grid text, .rp-x text { fill: var(--ink-3); font-family: var(--font); font-size: 12px; font-variant-numeric: tabular-nums; }
-.rp-baseline { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
-.rp-label { fill: var(--ink-2); font-family: var(--font); font-size: 12px; }
-.rp-axis-title { fill: var(--ink-2); font-family: var(--font); font-size: 12px; font-weight: 500; }
-.rp-crosshair { stroke: var(--axis); stroke-width: 1; pointer-events: none; }
-.rp-rule { stroke: var(--axis); stroke-width: 1; stroke-dasharray: 5 4; }
-.rp-rule-label { fill: var(--ink-2); font-family: var(--font); font-size: 12px; }
-.rp-dot { stroke: var(--surface); stroke-width: 1.5; }
-.rp-empty { fill: var(--ink-3); font-family: var(--font); font-size: 12px; }
-/* legend hover: the other series step back, they do not vanish */
-.rp-figure [data-s] { transition: opacity .12s; }
-.rp-figure [data-s].is-dim { opacity: .18; }
-.rp-legend li { cursor: default; }
-.rp-legend .rp-swatch.is-dashed { height: .25rem; border-radius: 1px; }
-.rp-tip {
-  position: absolute; pointer-events: none; z-index: 5;
-  background: var(--surface); color: var(--ink-1); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: .4rem .6rem; font-size: .85rem; line-height: 1.4;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .12); white-space: nowrap; display: none;
-}
-.rp-tip .rp-tip__head { color: var(--ink-2); margin-bottom: .15rem; }
-.rp-tip .rp-swatch { width: .6rem; height: .6rem; border-radius: 2px; display: inline-block; margin-right: .35rem; }
-.rp-tip .rp-tip__val { font-variant-numeric: tabular-nums; margin-left: .5rem; }
-
-.rp-table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: .95rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.rp-table th, .rp-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--border); text-align: left; }
-.rp-table th { color: var(--ink-2); font-weight: 600; font-size: .85rem; }
-.rp-table tr:last-child td { border-bottom: 0; }
-.rp-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-
-.rp-callout { border-left: 3px solid var(--accent); background: var(--surface); padding: .75rem 1rem; border-radius: 0 var(--radius) var(--radius) 0; margin-bottom: 1.5rem; }
-.rp-callout.is-good { border-left-color: var(--good); }
-.rp-callout.is-warning { border-left-color: var(--warning); }
-.rp-callout.is-critical { border-left-color: var(--critical); }
-.rp-callout__title { font-weight: 600; margin: 0 0 .25rem; }
-.rp-status { display: inline-flex; align-items: center; gap: .35rem; font-size: .85rem; }
-.rp-status::before { content: ""; width: .6rem; height: .6rem; border-radius: 50%; background: var(--ink-3); }
-.rp-status.is-good::before { background: var(--good); }
-.rp-status.is-warning::before { background: var(--warning); }
-.rp-status.is-serious::before { background: var(--serious); }
-.rp-status.is-critical::before { background: var(--critical); }
-.rp-kv { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1.5rem; margin: 0 0 1.5rem; }
-.rp-kv dt { color: var(--ink-2); }
-.rp-kv dd { margin: 0; }
-.rp-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 1rem; }
-
+@media (max-width: 760px) { .sf-doc-title { font-size: 34px; } }
+@media (max-width: 640px) { .sf-topbar-end { display: none; } }
+@media (max-width: 520px) { .sf-body .sf-facts { grid-template-columns: 84px 1fr; } }
+@media (prefers-reduced-motion: reduce) { *, *::before { transition: none !important; animation: none !important; } }
 @media print {
-  /* The h1 carries the title, so the top bar goes with the outline. */
-  .rp-nav, .rp-outline { display: none; }
-  .rp-layout { display: block; max-width: none; }
-  h2, h3, h4 { break-after: avoid; }
-  .rp-figure, .rp-tile, .rp-card { break-inside: avoid; }
+  .sf-topbar, .sf-contents, .sf-scrim { display: none; }
+  .sf-shell { padding-top: 0; }
+  .sf-footer-inner { padding-top: 48px; }
+  .sf-body :is(h2, h3, h4) { break-after: avoid; }
+  .sf-figure, .sf-equation, .sf-stats, .sf-callout, .sf-card, .sf-paper, .sf-question, .sf-hypothesis, .sf-decision, .sf-timeline > li { break-inside: avoid; }
 }
 </style>
 </head>
 <body>
-
-<header class="rp-nav">
-  <div class="rp-nav__inner">
-    <button class="rp-outline-toggle" id="rp-outline-toggle" type="button" aria-controls="rp-outline" aria-expanded="false">
-      <svg class="rp-toggle__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-        <path d="M2 4h12M5 8h9M5 12h9"/>
-      </svg>
-      <span>Contents</span>
-    </button>
-    <a class="rp-nav__brand" href="#top">{{TITLE}}</a>
-    <button class="rp-toggle" id="rp-toggle" type="button" aria-label="Toggle colour theme">
-      <svg class="rp-toggle__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-        <circle cx="8" cy="8" r="3.25"/>
-        <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06"/>
-      </svg>
-      <span class="rp-toggle__label-light">Light</span>
-      <span class="rp-toggle__label-dark">Dark</span>
-    </button>
-  </div>
+<header class="sf-topbar">
+  <a class="sf-topbar-back" href="#top">{{PATH}}</a>
+  <button class="sf-topbar-back sf-contents-toggle" id="contents-toggle" type="button" aria-controls="contents" aria-expanded="false">Contents</button>
+  <a class="sf-brand" href="#top"><span class="sf-brand-place">{{KICKER}}</span><span class="sf-brand-name">{{PROJECT}}</span></a>
+  <nav class="sf-topbar-end"><span class="sf-topbar-note">{{DATE}}</span></nav>
 </header>
+<div class="sf-scrim" id="scrim"></div>
 
-<div class="rp-layout">
-<nav class="rp-outline" id="rp-outline" aria-label="Contents">
-  <p class="rp-outline__title">Contents</p>
-  <!-- built at load from every h2, h3, and h4 inside a section.rp-section -->
-</nav>
+<main class="sf-shell" id="top">
+<article class="sf-article">
+<header class="sf-doc-header">
+  <p class="sf-doc-group">{{KICKER}}</p>
+  <h1 class="sf-doc-title">{{TITLE}}</h1>
+  <p class="sf-doc-meta"><span class="sf-doc-path">{{PATH}}</span><span class="sf-doc-kind">{{DATE}}</span><span class="sf-doc-senses">{{AUTHOR}}</span></p>
+</header>
+<div class="sf-body" id="body">
+<!-- BODY:BEGIN -->
+<!-- EXAMPLE:BEGIN: `report.py new` drops this block unless --with-example -->
+<p class="sf-lede">Gateway traffic held its weekday level, but p99 latency rose 10% after the Thursday deploy and stayed above the 180 ms objective for the rest of the week. The cause is the feed adapter's new retry policy; a fix is in review.</p>
 
-<main class="rp-main" id="top">
-  <header class="rp-header">
-    <h1>{{TITLE}}</h1>
-    <p class="rp-header__sub">{{SUBTITLE}}</p>
-    <div class="rp-header__meta">
-      <span>{{AUTHOR}}</span>
-      <span>{{DATE}}</span>
-    </div>
-  </header>
-
-<!-- SECTIONS:BEGIN -->
-<!-- EXAMPLE:BEGIN — `report.py new` drops this block unless --with-example -->
-  <section class="rp-section" id="summary">
-    <h2>Summary</h2>
-    <div class="rp-tiles">
-      <div class="rp-tile">
-        <div class="rp-tile__label">Requests served</div>
-        <div class="rp-tile__value">1.28M</div>
-        <div class="rp-tile__delta is-up">+4.2% vs last week</div>
-      </div>
-      <div class="rp-tile">
-        <div class="rp-tile__label">p99 latency</div>
-        <div class="rp-tile__value">184 ms</div>
-        <div class="rp-tile__delta is-down">+11 ms vs last week</div>
-      </div>
-      <div class="rp-tile">
-        <div class="rp-tile__label">Error rate</div>
-        <div class="rp-tile__value">0.31%</div>
-        <div class="rp-tile__delta">no change</div>
-      </div>
-    </div>
-    <div class="rp-callout is-warning">
-      <p class="rp-callout__title">Latency regressed after the Thursday deploy</p>
-      <p>The p99 rose by 11 ms. The cause is the new retry policy in the feed adapter. A fix is in review.</p>
-    </div>
-  </section>
-
-  <section class="rp-section" id="throughput">
-    <h2>Throughput</h2>
-    <p>Traffic follows the working week. Latency stepped up on Thursday and did not recover.</p>
-    <h3 id="requests">Requests</h3>
-    <figure class="rp-figure" id="fig-throughput">
-      <p class="rp-figure__title">Weekend traffic is half the weekday level</p>
-      <p class="rp-figure__sub">Requests per day, thousands. 2026-09-07 to 2026-09-13, UTC. n = 7 days.</p>
-      <figcaption>Figure 1. Source: gateway access logs, aggregated per calendar day. Weekend traffic is lower by design.</figcaption>
-    </figure>
-    <h3 id="latency">Latency</h3>
-    <figure class="rp-figure" id="fig-latency">
-      <p class="rp-figure__title">p99 latency rose 10% after the Thursday deploy</p>
-      <p class="rp-figure__sub">Latency (ms) per percentile, daily median of hourly samples. Same window. y axis starts at zero.</p>
-      <figcaption>Figure 2. Source: gateway metrics. The step on day 4 is the Thursday deploy.</figcaption>
-    </figure>
-  </section>
-
-  <section class="rp-section" id="details">
-    <h2>Details</h2>
-    <h3 id="services">Services</h3>
-    <table class="rp-table">
-      <thead><tr><th>Service</th><th>Status</th><th class="num">Requests</th><th class="num">p99 (ms)</th></tr></thead>
-      <tbody>
-        <tr><td>gateway</td><td><span class="rp-status is-good">healthy</span></td><td class="num">1,284,001</td><td class="num">184</td></tr>
-        <tr><td>feed-adapter</td><td><span class="rp-status is-warning">degraded</span></td><td class="num">412,330</td><td class="num">402</td></tr>
-        <tr><td>order-router</td><td><span class="rp-status is-good">healthy</span></td><td class="num">98,120</td><td class="num">61</td></tr>
-      </tbody>
-    </table>
-    <h3 id="environment">Environment</h3>
-    <dl class="rp-kv">
-      <dt>Window</dt><dd>2026-09-07 to 2026-09-13</dd>
-      <dt>Environment</dt><dd>production, eu-west-1</dd>
-    </dl>
-  </section>
-
-  <section class="rp-section" id="method">
-    <h2>Method</h2>
-    <h3 id="data-sources">Data sources</h3>
-    <h4 id="source-access-logs">Gateway access logs</h4>
-    <p>One line per request. Figure 1 counts the lines per calendar day in UTC.</p>
-    <h4 id="source-metrics">Gateway metrics</h4>
-    <p>Latency histograms, scraped every 5 minutes. Figure 2 takes the hourly percentiles and reports the daily median.</p>
-    <h3 id="limits">Limits</h3>
-    <p>The window is one week. A weekly pattern needs more weeks to confirm.</p>
-  </section>
-<!-- EXAMPLE:END -->
-<!-- SECTIONS:END -->
-
-  <footer class="rp-footer">
-    Generated {{DATE}} by {{AUTHOR}}.
-  </footer>
-</main>
+<div class="sf-stats">
+  <p class="sf-stat"><span class="sf-stat-value">1.28M</span><span class="sf-stat-label">requests served</span><span class="sf-stat-delta" data-tone="positive">+4.2% vs last week</span></p>
+  <p class="sf-stat"><span class="sf-stat-value">184 ms</span><span class="sf-stat-label">p99 latency</span><span class="sf-stat-delta" data-tone="negative">+11 ms vs last week</span></p>
+  <p class="sf-stat"><span class="sf-stat-value">0.31%</span><span class="sf-stat-label">error rate</span><span class="sf-stat-delta">no change</span></p>
+  <p class="sf-stat"><span class="sf-stat-value">7 days</span><span class="sf-stat-label">2026-09-07 to 09-13, UTC</span></p>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-<script>
-/* ============================================================
-   Report runtime: theme toggle, outline, and the chart helpers.
-   Charts set colour through CSS variables, so a theme change
-   re-colours every mark with no redraw.
-   ============================================================ */
-window.Report = (function (d3) {
-  "use strict";
+<aside class="sf-callout" data-tone="caution">
+  <p class="sf-label">Regression</p>
+  <p>The p99 rose by 11 ms on Thursday and did not recover. The retry policy in the feed adapter doubles the tail when the upstream is slow.[^1]</p>
+</aside>
 
-  /* ---- theme ---- */
-  var root = document.documentElement;
-  function setTheme(t) {
-    root.setAttribute("data-theme", t);
-    try { localStorage.setItem("rp-theme", t); } catch (e) {}
-  }
-  document.getElementById("rp-toggle").addEventListener("click", function () {
-    setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
-  });
+<h2>Throughput</h2>
 
-  /* ---- outline: a nested list from the section headings ---- */
-  // An h2 is a top-level entry, an h3 nests under the h2 before it, an h4
-  // under the h3. The first h2 of a section links to the section id; any
-  // other heading links to its own id, made from its text if it has none.
-  var outline = document.getElementById("rp-outline");
-  var outlineBtn = document.getElementById("rp-outline-toggle");
-  var narrow = window.matchMedia("(max-width: 63.99rem)");
-  var entries = [];   // {id, h, a, li} in document order
+<p>Traffic follows the working week: weekend days carry about half the weekday load (Figure 1).</p>
 
-  function slug(text) {
-    // Drop Latin accents (an "e" with an acute accent becomes "e"), then recompose, so the marks that
-    // other scripts need (Devanagari vowel signs, Japanese dakuten) stay.
-    return text.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").normalize("NFKC")
-      .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") || "section";
-  }
-  function uniqueId(base) {
-    var id = base, n = 2;
-    while (document.getElementById(id)) id = base + "-" + n++;
-    return id;
-  }
-  (function build() {
-    var top = document.createElement("ol");
-    var stack = [{ level: 1, list: top, li: null }];
-    document.querySelectorAll("section.rp-section h2, section.rp-section h3, section.rp-section h4").forEach(function (h) {
-      var text = h.textContent.replace(/\s+/g, " ").trim();
-      if (!text) return;
-      var level = +h.tagName.charAt(1);
-      var section = h.closest("section.rp-section");
-      var id;
-      if (level === 2 && section.id && section.querySelector("h2") === h) id = section.id;
-      else id = h.id || (h.id = uniqueId(slug(text)));
-      while (stack[stack.length - 1].level >= level) stack.pop();
-      var parent = stack[stack.length - 1];
-      if (!parent.list) { parent.list = document.createElement("ol"); parent.li.appendChild(parent.list); }
-      var li = document.createElement("li"), a = document.createElement("a");
-      a.href = "#" + id; a.textContent = text;
-      li.appendChild(a); parent.list.appendChild(li);
-      entries.push({ id: id, h: h, a: a, li: li });
-      stack.push({ level: level, list: null, li: li });
-    });
-    if (entries.length) { outline.appendChild(top); return; }
-    outline.hidden = true; outlineBtn.hidden = true;
-    root.classList.add("rp-no-outline");
-  })();
+<h3 id="requests">Requests</h3>
 
-  /* ---- outline: mark the entry the reader is in ---- */
-  var active = -1, pinned = -1, ticking = false;
-  function follow(a) {
-    // Keep the active entry in view inside the outline's own scroll.
-    var r = a.getBoundingClientRect(), o = outline.getBoundingClientRect(), pad = 24;
-    if (r.top < o.top + pad) outline.scrollTop += r.top - o.top - pad;
-    else if (r.bottom > o.bottom - pad) outline.scrollTop += r.bottom - o.bottom + pad;
-  }
-  function setActive(i) {
-    if (i === active) return;
-    if (active >= 0) { entries[active].a.classList.remove("is-active"); entries[active].a.removeAttribute("aria-current"); }
-    outline.querySelectorAll("li.is-open").forEach(function (li) { li.classList.remove("is-open"); });
-    active = i;
-    if (i < 0) return;
-    entries[i].a.classList.add("is-active"); entries[i].a.setAttribute("aria-current", "location");
-    for (var li = entries[i].li; li; li = li.parentElement.closest("li")) li.classList.add("is-open");
-    // Do not scroll the outline under a reader who is scanning it.
-    if (!outline.matches(":hover")) follow(entries[i].a);
-  }
-  function spy() {
-    ticking = false;
-    if (pinned >= 0 || !entries.length) return;
-    // A heading is current once its top passes a line just under the top bar,
-    // where a click on its entry puts it. In the last screen of scroll the line
-    // sweeps down to the bottom, so the short sections at the end still get a turn.
-    var view = window.innerHeight;
-    var line = document.querySelector(".rp-nav").getBoundingClientRect().bottom + 24;
-    var maxScroll = document.documentElement.scrollHeight - view;
-    var span = Math.min(view, maxScroll), remain = maxScroll - window.scrollY;
-    if (span > 0 && remain < span) line += (view - line) * (1 - Math.max(0, remain) / span);
-    // The current entry is the lowest heading above the line. Headings in
-    // side-by-side columns are not in vertical order, so scan them all; skip a
-    // heading with no box (hidden), whose top reads as 0.
-    var cur = 0, best = -Infinity;
-    for (var i = 0; i < entries.length; i++) {
-      var h = entries[i].h;
-      if (!h.getClientRects().length) continue;
-      var t = h.getBoundingClientRect().top;
-      if (t <= line && t >= best) { best = t; cur = i; }
-    }
-    setActive(cur);
-  }
-  function requestSpy() { if (!ticking) { ticking = true; requestAnimationFrame(spy); } }
-  function entryFor(id) {
-    for (var i = 0; id && i < entries.length; i++) if (entries[i].id === id || entries[i].h.id === id) return i;
-    return -1;
-  }
-  function pin(id) {
-    // After a jump, keep the chosen entry marked until the reader scrolls,
-    // clicks, or presses a key; a short section near the end may never reach
-    // the line. A target that is not an entry (or no hash) releases the pin.
-    var i = entryFor(id);
-    if (i >= 0) { pinned = i; setActive(i); } else { pinned = -1; requestSpy(); }
-  }
-  function hashId() { try { return decodeURIComponent(location.hash.slice(1)); } catch (e) { return ""; } }
-  if (entries.length) {
-    window.addEventListener("scroll", requestSpy, { passive: true });
-    window.addEventListener("resize", requestSpy);
-    window.addEventListener("load", requestSpy);
-    window.addEventListener("hashchange", function () { pin(hashId()); });
-    ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) {
-      window.addEventListener(t, function () { if (pinned >= 0) { pinned = -1; requestSpy(); } }, { passive: true });
-    });
-    outline.addEventListener("click", function (ev) {
-      var a = ev.target.closest("a");
-      // A modified click opens a new tab or window; this page does not move.
-      if (!a || ev.defaultPrevented || ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
-      pin(a.getAttribute("href").slice(1));
-      if (narrow.matches) openOutline(false);
-    });
-    // A fresh load jumps to the hash target, so pin it. A reload or a history
-    // load restores the old scroll position instead; pin the target only if
-    // the page still sits where the jump puts it.
-    var nav = performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
-    if (location.hash && (!nav || nav.type === "navigate")) pin(hashId());
-    else if (location.hash) window.addEventListener("load", function () {
-      requestAnimationFrame(function () {
-        var i = entryFor(hashId());
-        if (i < 0) return;
-        var top = entries[i].h.getBoundingClientRect().top;
-        var jumpTop = document.querySelector(".rp-nav").getBoundingClientRect().bottom + 16;
-        var atEnd = window.scrollY >= document.documentElement.scrollHeight - window.innerHeight - 2;
-        if (Math.abs(top - jumpTop) < 4 || (atEnd && top >= 0 && top < window.innerHeight)) pin(entries[i].id);
-      });
-    });
-    requestSpy();
-  }
+<figure class="sf-figure" id="fig-requests">
+  <div class="sf-chart"><script type="application/json">
+  {"data": {"values": [
+     {"day": "Mon", "requests": 212}, {"day": "Tue", "requests": 231}, {"day": "Wed", "requests": 224},
+     {"day": "Thu", "requests": 198}, {"day": "Fri", "requests": 205}, {"day": "Sat", "requests": 112},
+     {"day": "Sun", "requests": 102}]},
+   "mark": "bar",
+   "encoding": {
+     "x": {"field": "day", "type": "ordinal", "sort": null, "title": "Day of week (UTC)"},
+     "y": {"field": "requests", "type": "quantitative", "title": "Requests (thousands)"}
+   }}
+  </script></div>
+  <figcaption><strong>Figure 1.</strong> Weekend traffic is half the weekday level. Requests per calendar day, 2026-09-07 to 2026-09-13, UTC; n = 7 days. Data: gateway access logs.</figcaption>
+</figure>
 
-  /* ---- outline: a drawer on narrow screens ---- */
-  function openOutline(open) {
-    outline.classList.toggle("is-open", open);
-    outlineBtn.setAttribute("aria-expanded", String(open));
-    if (open) {
-      var a = active >= 0 ? entries[active].a : outline.querySelector("a");
-      if (a) { follow(a); a.focus({ preventScroll: true }); }
-    }
-  }
-  outlineBtn.addEventListener("click", function () { openOutline(!outline.classList.contains("is-open")); });
-  document.addEventListener("keydown", function (ev) {
-    if (ev.key === "Escape" && outline.classList.contains("is-open")) { openOutline(false); outlineBtn.focus({ preventScroll: true }); }
-  });
-  document.addEventListener("click", function (ev) {
-    if (outline.classList.contains("is-open") && !outline.contains(ev.target) && !outlineBtn.contains(ev.target)) openOutline(false);
-  });
-  // Focus that leaves the drawer goes to content under it; close the drawer.
-  outline.addEventListener("focusout", function (ev) {
-    var to = ev.relatedTarget;
-    if (outline.classList.contains("is-open") && to && !outline.contains(to) && to !== outlineBtn) openOutline(false);
-  });
-  narrow.addEventListener("change", function () {
-    // Crossing the breakpoint must not play the drawer's slide-out.
-    outline.style.transition = "none";
-    openOutline(false);
-    void outline.offsetWidth;
-    requestAnimationFrame(function () { outline.style.transition = ""; });
-  });
+<h3 id="latency">Latency</h3>
 
-  /* ---- shared ---- */
-  var SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)", "var(--series-4)",
-                "var(--series-5)", "var(--series-6)", "var(--series-7)", "var(--series-8)"];
-  var MAX_SERIES = SERIES.length;
-  var AXIS_TITLE_H = 18;
+<figure class="sf-figure" id="fig-latency">
+  <div class="sf-chart"><script type="application/json">
+  {"data": {"values": [
+     {"day": "2026-09-07", "pct": "p50", "ms": 41}, {"day": "2026-09-08", "pct": "p50", "ms": 40},
+     {"day": "2026-09-09", "pct": "p50", "ms": null}, {"day": "2026-09-10", "pct": "p50", "ms": 44},
+     {"day": "2026-09-11", "pct": "p50", "ms": 45}, {"day": "2026-09-12", "pct": "p50", "ms": 43},
+     {"day": "2026-09-13", "pct": "p50", "ms": 42},
+     {"day": "2026-09-07", "pct": "p99", "ms": 171}, {"day": "2026-09-08", "pct": "p99", "ms": 174},
+     {"day": "2026-09-09", "pct": "p99", "ms": null}, {"day": "2026-09-10", "pct": "p99", "ms": 190},
+     {"day": "2026-09-11", "pct": "p99", "ms": 188}, {"day": "2026-09-12", "pct": "p99", "ms": 186},
+     {"day": "2026-09-13", "pct": "p99", "ms": 184}]},
+   "layer": [
+     {"mark": {"type": "line", "point": true},
+      "encoding": {
+        "x": {"field": "day", "type": "temporal", "timeUnit": "utcyearmonthdate", "title": "Day (UTC)", "axis": {"format": "%a %d"}},
+        "y": {"field": "ms", "type": "quantitative", "title": "Latency (ms)"},
+        "color": {"field": "pct", "type": "nominal", "title": null}
+      }},
+     {"mark": "rule", "encoding": {"y": {"datum": 180}}},
+     {"mark": {"type": "text", "align": "left", "dx": 4, "dy": -7}, "encoding": {"y": {"datum": 180}, "x": {"value": 0}, "text": {"value": "SLO 180 ms"}}}
+   ]}
+  </script></div>
+  <figcaption><strong>Figure 2.</strong> p99 latency rose 10% after the Thursday deploy and stayed above the objective. Daily median of hourly percentiles, same window; n = 7 days, 1 missing (Wednesday scrape gap). Data: gateway metrics, Prometheus 5 m scrape.</figcaption>
+</figure>
 
-  function el(sel) {
-    var node = typeof sel === "string" ? document.querySelector(sel) : sel;
-    if (!node) throw new Error("Report: no element for " + sel);
+<h2>Services</h2>
+
+<table>
+  <thead><tr><th>Service</th><th>Status</th><th class="num">Requests</th><th class="num">p99 (ms)</th><th>Retry risk</th></tr></thead>
+  <tbody>
+    <tr><td>gateway</td><td><span class="sf-badge" data-tone="positive">healthy</span></td><td class="num">1,284,001</td><td class="num">184</td><td><span class="sf-meter" data-value="1" aria-label="1 of 5"></span></td></tr>
+    <tr><td>feed-adapter</td><td><span class="sf-badge" data-tone="caution">degraded</span></td><td class="num">412,330</td><td class="num">402</td><td><span class="sf-meter" data-value="4" aria-label="4 of 5"></span></td></tr>
+    <tr><td>order-router</td><td><span class="sf-badge" data-tone="positive">healthy</span></td><td class="num">98,120</td><td class="num">61</td><td><span class="sf-meter" data-value="2" aria-label="2 of 5"></span></td></tr>
+  </tbody>
+</table>
+
+<h2>What changed</h2>
+
+<ol class="sf-timeline">
+  <li>
+    <time>Mon</time>
+    <div>
+      <p><strong>Cache warm-up job moved to 02:00 UTC</strong></p>
+      <p>No effect on the peak hours.</p>
+    </div>
+  </li>
+  <li data-tone="accent">
+    <time>Thu</time>
+    <div>
+      <p><strong>Feed adapter 4.2 deployed</strong></p>
+      <p>Introduced exponential retry on upstream timeouts; the p99 step starts here.</p>
+    </div>
+  </li>
+</ol>
+
+<div class="sf-cards">
+  <article class="sf-card">
+    <p class="sf-card-title">Feed adapter 4.2</p>
+    <p>Retries a timed-out upstream call up to three times with backoff.</p>
+    <ul class="sf-tags"><li>deploy</li><li>latency</li></ul>
+  </article>
+  <article class="sf-card">
+    <p class="sf-card-title">Retry budget fix</p>
+    <p>Caps retries at 10% of calls per minute. In review.</p>
+    <ul class="sf-tags"><li>fix</li></ul>
+  </article>
+</div>
+
+<h2>Method</h2>
+
+<dl class="sf-facts"><dt>Window</dt><dd>2026-09-07 to 2026-09-13, UTC</dd><dt>Environment</dt><dd>production, eu-west-1</dd><dt>Owner</dt><dd>platform team</dd></dl>
+
+<h3 id="budget">Error budget</h3>
+
+<p>The weekly error budget \(B\) is what the objective allows to fail:</p>
+
+<figure class="sf-equation" data-label="1">
+  \[ B = (1 - o)\,N \]
+  <figcaption>\(o\): the availability objective (0.999); \(N\): requests in the window.</figcaption>
+</figure>
+
+<blockquote class="sf-quote"><p>Retries without a budget turn a slow dependency into a slow service.</p><cite>Incident review 2026-09-12, §4</cite></blockquote>
+
+<h2>Next steps</h2>
+
+<ol class="sf-steps">
+  <li data-state="done"><p class="sf-step-title">Find the cause</p><p>Bisected to the retry policy in feed adapter 4.2.</p></li>
+  <li data-state="current"><p class="sf-step-title">Ship the retry budget</p><p>In review; expected Tuesday.</p></li>
+  <li><p class="sf-step-title">Confirm recovery</p><p>p99 back under 180 ms for three days.</p></li>
+</ol>
+
+<div class="sf-decision" id="d1">
+  <p class="sf-head"><span class="sf-id">D1</span>Roll back 4.2 until the budget ships?</p>
+  <p>A rollback restores the p99 now but drops the timeout fix that 4.2 also carries.</p>
+  <ul class="sf-options">
+    <li data-recommended><strong>Keep 4.2</strong>: the budget lands within days and the timeouts stay fixed.</li>
+    <li><strong>Roll back</strong>: p99 recovers today; timeouts return until the next deploy.</li>
+  </ul>
+</div>
+
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><a href="https://sre.google/sre-book/handling-overload/">Site Reliability Engineering, ch. 21: Handling Overload</a></li>
+</ol>
+</section>
+<!-- EXAMPLE:END -->
+<!-- BODY:END -->
+</div>
+</article>
+</main>
+
+<nav class="sf-rail sf-contents" id="contents" aria-label="On this page">
+  <p class="sf-rail-label">On this page</p>
+  <div class="sf-contents-list" id="contents-list"><span class="sf-contents-pill" id="pill" aria-hidden="true"></span></div>
+</nav>
+
+<footer class="sf-footer">
+  <div class="sf-footer-inner">
+    <p class="sf-footer-plate"><span class="sf-footer-pipe">|</span> {{PROJECT}} · {{KICKER}} <span class="sf-footer-pipe">|</span></p>
+    <p class="sf-footer-plate sf-footer-about">Generated {{DATE}} by {{AUTHOR}}</p>
+  </div>
+</footer>
+
+<script id="sf-runtime">
+// Report runtime: numbered sections, the outline, footnotes, math, and Vega-Lite charts themed from the tokens.
+// A report never edits this script: `report.py lint` fails when it differs from the template.
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (sel) => document.querySelector(sel);
+  const body = $("#body");
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
     return node;
   }
-  function fmt(opts) { return opts.format ? d3.format(opts.format) : d3.format(",~f"); }
-  function tooltip(figure) {
-    var tip = figure.querySelector(".rp-tip");
-    if (!tip) { tip = document.createElement("div"); tip.className = "rp-tip"; figure.appendChild(tip); }
+
+  function roman(n) {
+    const table = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]];
+    let out = "";
+    for (const [value, glyph] of table) while (n >= value) { out += glyph; n -= value; }
+    return out;
+  }
+
+  function slugify(text, used) {
+    const base = text.toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "section";
+    let id = base;
+    for (let i = 2; used.has(id); i++) id = `${base}-${i}`;
+    used.add(id);
+    return id;
+  }
+
+  // KaTeX renders \( \) and \[ \] before anything reads the heading text.
+  window.renderMathInElement?.(body, {
+    delimiters: [
+      { left: "\\[", right: "\\]", display: true },
+      { left: "\\(", right: "\\)", display: false },
+    ],
+    throwOnError: false,
+  });
+
+  // [^n] citation markers become footnote links to <section class="footnotes"> item n.
+  (function linkFootnotes() {
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => node.parentElement.closest("script, code, pre, .katex") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes = [];
+    while (walker.nextNode()) if (/\[\^\d+\]/.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
+    const seen = new Set();
+    for (const node of nodes) {
+      const frag = document.createDocumentFragment();
+      for (const part of node.nodeValue.split(/(\[\^\d+\])/)) {
+        const n = part.match(/^\[\^(\d+)\]$/)?.[1];
+        if (!n) {
+          if (part) frag.append(part);
+          continue;
+        }
+        const sup = el("sup", "footnote-ref");
+        const a = el("a", "", n);
+        a.href = `#fn${n}`;
+        if (!seen.has(n)) a.id = `fnref${n}`;
+        seen.add(n);
+        sup.append(a);
+        frag.append(sup);
+      }
+      node.replaceWith(frag);
+    }
+    for (const item of body.querySelectorAll("section.footnotes li[id^='fn']")) {
+      const back = el("a", "footnote-backref", "↩︎");
+      back.href = `#fnref${item.id.slice(2)}`;
+      (item.querySelector("p") ?? item).append(" ", back);
+    }
+  })();
+
+  // Sections: h2 gets a roman numeral, h2 and h3 get an id (the author's, or one from the text).
+  (function decorate() {
+    const used = new Set([...document.querySelectorAll("[id]")].map((node) => node.id));
+    let n = 0;
+    for (const h of body.querySelectorAll("h2, h3")) {
+      h.dataset.label = h.textContent.replace(/\s+/g, " ").trim();
+      if (!h.id) h.id = slugify(h.dataset.label, used);
+      if (h.tagName === "H2") {
+        h.dataset.numeral = roman(++n);
+        const numeral = el("span", "sf-section-numeral", h.dataset.numeral);
+        numeral.setAttribute("aria-hidden", "true");
+        h.prepend(numeral);
+      }
+    }
+    for (const table of body.querySelectorAll("table")) {
+      const wrap = el("div", "sf-table-wrap");
+      table.classList.add("sf-table");
+      table.replaceWith(wrap);
+      wrap.append(table);
+    }
+    for (const pre of body.querySelectorAll("pre")) {
+      const wrap = el("div", "sf-code");
+      pre.replaceWith(wrap);
+      wrap.append(pre);
+    }
+    const notes = body.querySelector("section.footnotes");
+    if (notes) {
+      notes.id ||= "footnotes";
+      notes.dataset.label = "Sources";
+    }
+  })();
+
+  // Vega-Lite specs in <div class="sf-chart"><script type="application/json">, themed with the tokens.
+  function chartConfig() {
+    const css = getComputedStyle(document.documentElement);
+    const v = (name) => css.getPropertyValue(name).trim();
+    const series = v("--sf-series").split(",").map((c) => c.trim());
+    const axis = {
+      domainColor: v("--site-line"), gridColor: v("--site-line"), tickColor: v("--site-line"),
+      labelColor: v("--site-muted"), titleColor: v("--site-muted"),
+      labelFontSize: 11, titleFontSize: 11, titleFontWeight: 500, labelPadding: 6, titlePadding: 10,
+    };
     return {
-      show: function (html, x, y) {
-        tip.innerHTML = html; tip.style.display = "block";
-        var fw = figure.clientWidth, tw = tip.offsetWidth;
-        tip.style.left = Math.min(x + 12, fw - tw - 8) + "px";
-        tip.style.top = Math.max(y - tip.offsetHeight - 12, 4) + "px";
-      },
-      hide: function () { tip.style.display = "none"; }
+      font: v("--site-font"),
+      background: null,
+      view: { stroke: null },
+      axis,
+      axisX: { grid: false, labelAngle: 0 },
+      legend: { labelColor: v("--site-muted"), titleColor: v("--site-muted"), labelFontSize: 11, titleFontSize: 11, titleFontWeight: 500, orient: "top", symbolSize: 60 },
+      title: { color: v("--site-fg"), fontSize: 13, fontWeight: 540, anchor: "start", offset: 12 },
+      range: { category: series },
+      mark: { tooltip: true, color: series[0] },
+      line: { strokeWidth: 2 },
+      point: { size: 64, filled: true },
+      bar: { cornerRadiusEnd: 4 },
+      // Reference lines (a target, an SLO) are not series: hairline, dashed, muted, with a text label.
+      rule: { color: v("--site-subtle"), strokeDash: [5, 4], strokeWidth: 1, tooltip: false },
+      text: { color: v("--site-muted"), fontSize: 11, tooltip: false },
     };
   }
-  /* A point is drawable when its value is a finite number; on a log axis it
-     must also be positive. Anything else leaves a gap, it does not break the
-     path and it does not move the axis. */
-  function ok(v, log) { return v != null && isFinite(v) && (!log || v > 0); }
-  function drawable(values, log) { return values.filter(function (d) { return ok(d.y, log); }); }
-  function lastOf(values, log) { var d = drawable(values, log); return d.length ? d[d.length - 1] : null; }
-  function noData(g, w, h) {
-    g.append("text").attr("class", "rp-empty").attr("x", w / 2).attr("y", h / 2)
-      .attr("text-anchor", "middle").attr("dominant-baseline", "middle").text("no data");
-  }
-  /* Reference lines: a target, an SLO, last quarter. Not a series, so they wear
-     --axis and a dash, never a series colour. Each one carries its own label. */
-  function rules(g, opts, scale, horizontal, w, h) {
-    var list = opts.rule ? (Array.isArray(opts.rule) ? opts.rule : [opts.rule]) : [];
-    list.forEach(function (r) {
-      if (!ok(r.value, opts.log)) return;
-      var p = scale(r.value);
-      var ln = g.append("line").attr("class", "rp-rule");
-      if (horizontal) ln.attr("x1", 0).attr("x2", w).attr("y1", p).attr("y2", p);
-      else ln.attr("x1", p).attr("x2", p).attr("y1", 0).attr("y2", h);
-      if (r.label) {
-        var t = g.append("text").attr("class", "rp-rule-label").text(r.label);
-        if (horizontal) t.attr("x", w).attr("y", p - 5).attr("text-anchor", "end");
-        else t.attr("x", p + 5).attr("y", 10);
+
+  (function renderCharts() {
+    const charts = [...body.querySelectorAll(".sf-chart")];
+    if (!charts.length) return;
+    const urls = [
+      "https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js",
+      "https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js",
+      "https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js",
+    ];
+    const ready = urls.reduce((chain, src) => chain.then(() => new Promise((resolve, reject) => {
+      const script = Object.assign(document.createElement("script"), { src, onload: resolve, onerror: reject });
+      document.head.append(script);
+    })), Promise.resolve());
+    ready.then(() => {
+      const config = chartConfig();
+      for (const chart of charts) {
+        let spec;
+        try {
+          spec = JSON.parse(chart.querySelector("script[type='application/json']")?.textContent ?? "");
+        } catch (err) {
+          chart.replaceChildren(el("p", "sf-chart-error", `Chart spec is not valid JSON: ${err.message}`));
+          continue;
+        }
+        const target = el("div");
+        chart.append(target);
+        const label = chart.closest("figure")?.querySelector("figcaption")?.textContent.trim();
+        window.vegaEmbed(target, { width: "container", height: 240, ...spec }, { actions: false, renderer: "svg", config })
+          .then(() => { if (label) target.querySelector("svg")?.setAttribute("aria-label", label); })
+          .catch((err) => chart.replaceChildren(el("p", "sf-chart-error", `Chart failed: ${err.message}`)));
       }
-    });
+    }, () => charts.forEach((chart) => chart.append(el("p", "sf-chart-error", "Could not load the chart library."))));
+  })();
+
+  // Outline: one entry per h2 (with its numeral) and h3, plus the sources list.
+  const list = $("#contents-list");
+  const pill = $("#pill");
+  const targets = [...body.querySelectorAll("h2, h3, section.footnotes")];
+  for (const target of targets) {
+    const link = el("a", "sf-contents-link");
+    link.href = `#${target.id}`;
+    link.dataset.target = target.id;
+    if (target.tagName !== "H2" && target.tagName !== "SECTION") link.classList.add("is-sub");
+    const numeral = el("span", "sf-contents-numeral", target.dataset.numeral ?? "");
+    numeral.setAttribute("aria-hidden", "true");
+    link.append(numeral, el("span", "sf-contents-name", target.dataset.label));
+    link.title = target.dataset.label;
+    list.append(link);
   }
-  /* Legend hover: the hovered series keeps its colour, the rest step back. The
-     marks are found at hover time, so a redraw in between does no harm. */
-  function spotlight(figure, i) {
-    var marks = figure.querySelectorAll("[data-s]");
-    for (var k = 0; k < marks.length; k++) {
-      marks[k].classList.toggle("is-dim", i != null && marks[k].getAttribute("data-s") !== String(i));
-    }
-  }
-  function legend(figure, items) {
-    var old = figure.querySelector(".rp-legend"); if (old) old.remove();
-    if (items.length < 2) return;
-    var ul = document.createElement("ul"); ul.className = "rp-legend";
-    items.forEach(function (it, i) {
-      var name = typeof it === "string" ? it : it.name;
-      var li = document.createElement("li");
-      var sw = document.createElement("span"); sw.className = "rp-swatch";
-      if (it && it.dashed) {
-        sw.classList.add("is-dashed");
-        sw.style.background = "repeating-linear-gradient(90deg," + SERIES[i] + " 0 4px, transparent 4px 7px)";
-      } else {
-        sw.style.background = SERIES[i];
-      }
-      li.appendChild(sw); li.appendChild(document.createTextNode(name)); ul.appendChild(li);
-      li.addEventListener("pointerenter", function () { spotlight(figure, i); });
-      li.addEventListener("pointerleave", function () { spotlight(figure, null); });
-    });
-    var sub = figure.querySelector(".rp-figure__sub") || figure.querySelector(".rp-figure__title");
-    sub ? sub.after(ul) : figure.prepend(ul);
-  }
-  function frame(figure, opts) {
-    var old = figure.querySelector("svg"); if (old) old.remove();
-    var width = figure.clientWidth - 2 * parseFloat(getComputedStyle(figure).paddingLeft) || 600;
-    var height = opts.height || 280;
-    var m = Object.assign({ top: 12, right: 16, bottom: 28, left: 44 }, opts.margin || {});
-    // Axis titles ("Latency (ms)") take one extra text row on their side.
-    if (opts.xLabel) m.bottom += AXIS_TITLE_H;
-    if (opts.yLabel) m.left += AXIS_TITLE_H;
-    var svg = d3.select(figure).insert("svg", "figcaption")
-      .attr("viewBox", [0, 0, width, height]).attr("width", width).attr("height", height)
-      .attr("role", "img").attr("aria-label", opts.ariaLabel || (figure.querySelector(".rp-figure__title") || {}).textContent || "");
-    var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
-    var w = width - m.left - m.right, h = height - m.top - m.bottom;
-    if (opts.xLabel) {
-      svg.append("text").attr("class", "rp-axis-title").attr("text-anchor", "middle")
-        .attr("x", m.left + w / 2).attr("y", height - 4).text(opts.xLabel);
-    }
-    if (opts.yLabel) {
-      // A log axis says so in its own title; the reader must never guess the scale.
-      var yl = opts.log && !/\blog\b/i.test(opts.yLabel) ? opts.yLabel + " (log)" : opts.yLabel;
-      svg.append("text").attr("class", "rp-axis-title").attr("text-anchor", "middle")
-        .attr("transform", "translate(12," + (m.top + h / 2) + ") rotate(-90)").text(yl);
-    }
-    return { svg: svg, g: g, w: w, h: h };
-  }
-  function yGrid(g, y, w, opts) {
-    var ax = d3.axisLeft(y).tickSize(-w).tickPadding(8).tickFormat(fmt(opts));
-    // A log scale hands back every minor tick; keep the ones the count asks for.
-    if (opts.log) ax.tickValues(y.ticks(opts.ticks || 5)); else ax.ticks(opts.ticks || 5);
-    g.append("g").attr("class", "rp-grid").call(ax);
-  }
-  function observe(figure, draw) {
-    if (figure.__rpObserver) figure.__rpObserver.disconnect();
-    var ro = new ResizeObserver(function () { draw(); });
-    ro.observe(figure); figure.__rpObserver = ro;
-  }
-  function checkSeries(n) {
-    if (n > MAX_SERIES) throw new Error("Report: " + n + " series; the cap is " + MAX_SERIES + ". Fold the rest into 'Other' or facet.");
+  const contents = $("#contents");
+  const toggle = $("#contents-toggle");
+  if (!targets.length) {
+    contents.hidden = true;
+    toggle.hidden = true;
   }
 
-  /* ---- bar / column: [{label, value}] or grouped [{label, values:{name: v}}] ---- */
-  function bar(sel, data, opts) {
-    opts = opts || {};
-    var figure = el(sel);
-    var names = opts.series || (data.length && data[0].values ? Object.keys(data[0].values) : []);
-    var grouped = names.length > 0; checkSeries(grouped ? names.length : 1);
-    legend(figure, names);
-    var f = fmt(opts), tip = tooltip(figure);
-    function draw() {
-      var fr = frame(figure, opts), g = fr.g, w = fr.w, h = fr.h;
-      var x0 = d3.scaleBand().domain(data.map(function (d) { return d.label; })).range([0, w]).paddingInner(0.3).paddingOuter(0.15);
-      var maxV = grouped ? d3.max(data, function (d) { return d3.max(names, function (n) { return d.values[n]; }); })
-                         : d3.max(data, function (d) { return d.value; });
-      if (!ok(maxV) && opts.max == null) { noData(g, w, h); return; }
-      var y = d3.scaleLinear().domain([0, opts.max != null ? opts.max : (maxV || 1)]).nice().range([h, 0]);
-      yGrid(g, y, w, opts);
-      g.append("g").attr("class", "rp-x").attr("transform", "translate(0," + h + ")").call(d3.axisBottom(x0).tickSize(0).tickPadding(8));
-      g.append("line").attr("class", "rp-baseline").attr("x1", 0).attr("x2", w).attr("y1", h).attr("y2", h);
-      // Bars of one group stay side by side. A sub-band scale would centre each
-      // bar in its own slot, so the 24px cap pushes the bars of a group apart
-      // until the group reads as separate bars. Lay the group out from its centre.
-      var nS = grouped ? names.length : 1;
-      var bw = Math.min(24, (x0.bandwidth() / nS) * (grouped ? 0.85 : 1));
-      var gap = grouped ? Math.min(4, bw * 0.2) : 0;
-      var groupW = nS * bw + (nS - 1) * gap;
-      var groupX = function (label) { return x0(label) + (x0.bandwidth() - groupW) / 2; };
-      function path(x, top) {
-        var r = Math.min(4, bw / 2, Math.max(0, h - top)); var x2 = x + bw;
-        return "M" + x + "," + h + "V" + (top + r) + "Q" + x + "," + top + " " + (x + r) + "," + top +
-               "H" + (x2 - r) + "Q" + x2 + "," + top + " " + x2 + "," + (top + r) + "V" + h + "Z";
-      }
-      var rows = [];
-      data.forEach(function (d) {
-        if (grouped) names.forEach(function (n, i) { rows.push({ label: d.label, name: n, i: i, v: d.values[n], x: groupX(d.label) + i * (bw + gap) }); });
-        else rows.push({ label: d.label, name: null, i: 0, v: d.value, x: groupX(d.label) });
-      });
-      // A missing value leaves an empty slot. It must never read as a zero bar.
-      rows = rows.filter(function (r) { return ok(r.v); });
-      rules(g, opts, y, true, w, h);
-      g.selectAll("path.rp-bar").data(rows).join("path").attr("class", "rp-bar")
-        .attr("data-s", function (r) { return r.i; })
-        .attr("d", function (r) { return path(r.x, y(Math.max(0, r.v))); })
-        .style("fill", function (r) { return SERIES[r.i]; })
-        .on("mousemove", function (ev, r) {
-          var p = d3.pointer(ev, figure);
-          tip.show("<div class='rp-tip__head'>" + r.label + "</div>" + (r.name ? "<span class='rp-swatch' style='background:" + SERIES[r.i] + "'></span>" + r.name : "") +
-                   "<span class='rp-tip__val'>" + f(r.v) + "</span>", p[0], p[1]);
-        }).on("mouseleave", tip.hide);
-      if (opts.labels === "all" || (opts.labels !== false && !grouped && data.length <= 12)) {
-        g.selectAll("text.rp-label").data(rows).join("text").attr("class", "rp-label")
-          .attr("data-s", function (r) { return r.i; })
-          .attr("x", function (r) { return r.x + bw / 2; }).attr("y", function (r) { return y(Math.max(0, r.v)) - 6; })
-          .attr("text-anchor", "middle").text(function (r) { return f(r.v); });
-      }
-    }
-    draw(); observe(figure, draw);
+  function follow(link) {
+    // Keep the active entry in view inside the rail's own scroll.
+    const r = link.getBoundingClientRect();
+    const o = contents.getBoundingClientRect();
+    const pad = 24;
+    if (r.top < o.top + pad) contents.scrollTop += r.top - o.top - pad;
+    else if (r.bottom > o.bottom - pad) contents.scrollTop += r.bottom - o.bottom + pad;
   }
 
-  /* ---- line: [{name, values:[{x, y}], dashed}] ; x is Date or number ---- */
-  function line(sel, series, opts) {
-    opts = opts || {};
-    var figure = el(sel);
-    checkSeries(series.length);
-    legend(figure, series.map(function (s) { return { name: s.name, dashed: !!s.dashed }; }));
-    var f = fmt(opts), tip = tooltip(figure);
-    var log = !!opts.log;
-    var isTime = series.length && series[0].values.length && series[0].values[0].x instanceof Date;
-    var xf = opts.xFormat ? (isTime ? d3.timeFormat(opts.xFormat) : d3.format(opts.xFormat)) : (isTime ? d3.timeFormat("%b %d") : d3.format("~f"));
-    function draw() {
-      var fr = frame(figure, opts), g = fr.g, w = fr.w, h = fr.h;
-      // Only drawable points set the axes. A null or a non-positive value on a
-      // log axis leaves a gap in the line and stays out of the domain.
-      var pts = series.map(function (s) { return drawable(s.values, log); });
-      var all = pts.flat();
-      if (!all.length) { noData(g, w, h); return; }
-      var x = (isTime ? d3.scaleTime() : d3.scaleLinear()).domain(d3.extent(all, function (d) { return d.x; })).range([0, w]);
-      var dMin = d3.min(all, function (d) { return d.y; }), dMax = d3.max(all, function (d) { return d.y; });
-      var lo = opts.min != null ? opts.min : (log || opts.zero === false ? dMin : 0);
-      var hi = opts.max != null ? opts.max : dMax;
-      if (hi === lo) hi = lo + (Math.abs(lo) || 1);
-      var y = (log ? d3.scaleLog() : d3.scaleLinear()).domain([lo, hi]).nice().range([h, 0]);
-      yGrid(g, y, w, opts);
-      g.append("g").attr("class", "rp-x").attr("transform", "translate(0," + h + ")").call(d3.axisBottom(x).ticks(opts.xTicks || 6).tickSize(0).tickPadding(8).tickFormat(xf));
-      g.append("line").attr("class", "rp-baseline").attr("x1", 0).attr("x2", w).attr("y1", h).attr("y2", h);
-      rules(g, opts, y, true, w, h);
-      var defined = function (d) { return ok(d.y, log); };
-      var ln = d3.line().defined(defined).x(function (d) { return x(d.x); }).y(function (d) { return y(d.y); }).curve(opts.curve === "smooth" ? d3.curveMonotoneX : d3.curveLinear);
-      if (opts.area) {
-        var ar = d3.area().defined(defined).x(function (d) { return x(d.x); }).y0(h).y1(function (d) { return y(d.y); }).curve(opts.curve === "smooth" ? d3.curveMonotoneX : d3.curveLinear);
-        g.selectAll("path.rp-area").data(series).join("path").attr("class", "rp-area")
-          .attr("data-s", function (s, i) { return i; })
-          .attr("d", function (s) { return ar(s.values); })
-          .style("fill", function (s, i) { return SERIES[i]; }).style("fill-opacity", 0.1);
+  let activeId = null;
+  function setActive(id) {
+    if (id === activeId) return;
+    activeId = id;
+    for (const link of list.querySelectorAll(".sf-contents-link")) {
+      const on = link.dataset.target === id;
+      link.toggleAttribute("data-active", on);
+      if (!on) {
+        link.removeAttribute("aria-current");
+        continue;
       }
-      g.selectAll("path.rp-line").data(series).join("path").attr("class", "rp-line")
-        .attr("data-s", function (s, i) { return i; })
-        .attr("d", function (s) { return ln(s.values); })
-        .style("fill", "none").style("stroke", function (s, i) { return SERIES[i]; })
-        .style("stroke-dasharray", function (s) { return s.dashed ? "5 4" : null; })
-        .style("stroke-width", 2).style("stroke-linejoin", "round").style("stroke-linecap", "round");
-      // A sparse series reads as a trend it does not have; mark its points.
-      var mark = opts.points === true || (opts.points !== false && all.length && d3.max(pts, function (p) { return p.length; }) <= 12);
-      if (mark) {
-        var marks = [];
-        pts.forEach(function (p, i) { p.forEach(function (d) { marks.push({ i: i, d: d }); }); });
-        g.selectAll("circle.rp-dot").data(marks).join("circle").attr("class", "rp-dot")
-          .attr("data-s", function (m) { return m.i; })
-          .attr("cx", function (m) { return x(m.d.x); }).attr("cy", function (m) { return y(m.d.y); }).attr("r", 3)
-          .style("fill", function (m) { return SERIES[m.i]; });
+      link.setAttribute("aria-current", "location");
+      pill.style.transform = `translateY(${link.offsetTop}px)`;
+      pill.style.height = `${link.offsetHeight}px`;
+      if (!pill.hasAttribute("data-travel")) {
+        // First placement: commit the position before enabling transitions so it fades in rather than slides.
+        void pill.offsetHeight;
+        pill.toggleAttribute("data-travel", true);
       }
-      // end markers: 8px dot with a 2px surface ring, on the last drawable point
-      var ends = pts.map(function (p, i) { return { i: i, d: p[p.length - 1] }; }).filter(function (e) { return e.d; });
-      g.selectAll("circle.rp-end").data(ends).join("circle").attr("class", "rp-end")
-        .attr("data-s", function (e) { return e.i; })
-        .attr("cx", function (e) { return x(e.d.x); }).attr("cy", function (e) { return y(e.d.y); }).attr("r", 4)
-        .style("fill", function (e) { return SERIES[e.i]; }).style("stroke", "var(--surface)").style("stroke-width", 2);
-      if (opts.labels !== false && series.length <= 4) {
-        g.selectAll("text.rp-label").data(ends).join("text").attr("class", "rp-label")
-          .attr("data-s", function (e) { return e.i; })
-          .attr("x", function (e) { return x(e.d.x) + 8; }).attr("y", function (e) { return y(e.d.y) + 4; })
-          .text(function (e) { return f(e.d.y); });
-      }
-      // crosshair + tooltip
-      var cross = g.append("line").attr("class", "rp-crosshair").attr("y1", 0).attr("y2", h).style("display", "none");
-      var dots = g.append("g").style("display", "none");
-      var bis = d3.bisector(function (d) { return d.x; }).center;
-      g.append("rect").attr("width", w).attr("height", h).style("fill", "none").style("pointer-events", "all")
-        .on("mousemove", function (ev) {
-          var px = d3.pointer(ev, this)[0], xv = x.invert(px);
-          // A series with no point near this x drops out of the read-out.
-          var rows = [];
-          pts.forEach(function (p, i) { if (p.length) rows.push({ i: i, name: series[i].name, d: p[bis(p, xv)] }); });
-          if (!rows.length) return;
-          var ax = x(rows[0].d.x);
-          cross.style("display", null).attr("x1", ax).attr("x2", ax);
-          dots.style("display", null).selectAll("circle").data(rows).join("circle").attr("r", 4)
-            .attr("cx", function (r) { return x(r.d.x); }).attr("cy", function (r) { return y(r.d.y); })
-            .style("fill", function (r) { return SERIES[r.i]; }).style("stroke", "var(--surface)").style("stroke-width", 2);
-          var p = d3.pointer(ev, figure);
-          tip.show("<div class='rp-tip__head'>" + xf(rows[0].d.x) + "</div>" + rows.map(function (r) {
-            return "<div><span class='rp-swatch' style='background:" + SERIES[r.i] + "'></span>" + (r.name || "") + "<span class='rp-tip__val'>" + f(r.d.y) + "</span></div>";
-          }).join(""), p[0], p[1]);
-        })
-        .on("mouseleave", function () { cross.style("display", "none"); dots.style("display", "none"); tip.hide(); });
+      if (!contents.matches(":hover")) follow(link);
     }
-    draw(); observe(figure, draw);
   }
 
-  /* ---- horizontal bar: [{label, value}] ; for long category names ---- */
-  function hbar(sel, data, opts) {
-    opts = opts || {};
-    var figure = el(sel);
-    var f = fmt(opts), tip = tooltip(figure);
-    legend(figure, []);
-    function draw() {
-      var rowH = 32;
-      var o = Object.assign({ height: data.length * rowH + 24, margin: { top: 4, right: 48, bottom: 20, left: opts.labelWidth || 140 } }, opts);
-      var fr = frame(figure, o), g = fr.g, w = fr.w, h = fr.h;
-      var maxV = d3.max(data, function (d) { return d.value; });
-      if (!ok(maxV) && opts.max == null) { noData(g, w, h); return; }
-      // The band keeps every category, so a missing value shows its name and no bar.
-      var bars = data.filter(function (d) { return ok(d.value); });
-      var y = d3.scaleBand().domain(data.map(function (d) { return d.label; })).range([0, h]).paddingInner(0.3);
-      var x = d3.scaleLinear().domain([0, opts.max != null ? opts.max : (maxV || 1)]).nice().range([0, w]);
-      g.append("g").attr("class", "rp-grid").call(d3.axisBottom(x).ticks(opts.ticks || 5).tickSize(h).tickPadding(6).tickFormat(f));
-      g.append("g").attr("class", "rp-axis").call(d3.axisLeft(y).tickSize(0).tickPadding(8)).select(".domain").remove();
-      g.append("line").attr("class", "rp-baseline").attr("x1", 0).attr("x2", 0).attr("y1", 0).attr("y2", h);
-      rules(g, opts, x, false, w, h);
-      var bh = Math.min(24, y.bandwidth());
-      g.selectAll("path.rp-bar").data(bars).join("path").attr("class", "rp-bar")
-        .attr("d", function (d) {
-          var top = y(d.label) + (y.bandwidth() - bh) / 2, end = x(d.value), r = Math.min(4, bh / 2, end);
-          return "M0," + top + "H" + (end - r) + "Q" + end + "," + top + " " + end + "," + (top + r) + "V" + (top + bh - r) +
-                 "Q" + end + "," + (top + bh) + " " + (end - r) + "," + (top + bh) + "H0Z";
-        })
-        .style("fill", SERIES[0])
-        .on("mousemove", function (ev, d) { var p = d3.pointer(ev, figure); tip.show("<div class='rp-tip__head'>" + d.label + "</div>" + f(d.value), p[0], p[1]); })
-        .on("mouseleave", tip.hide);
-      if (opts.labels !== false) {
-        g.selectAll("text.rp-label").data(bars).join("text").attr("class", "rp-label")
-          .attr("x", function (d) { return x(d.value) + 6; }).attr("y", function (d) { return y(d.label) + y.bandwidth() / 2 + 4; })
-          .text(function (d) { return f(d.value); });
-      }
+  function spy() {
+    $(".sf-topbar").toggleAttribute("data-scrolled", scrollY > 4);
+    if (!targets.length) return;
+    const line = $(".sf-topbar").offsetHeight + 72;
+    let active = targets[0];
+    for (const target of targets) {
+      if (target.getBoundingClientRect().top > line) break;
+      active = target;
     }
-    draw(); observe(figure, draw);
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) active = targets.at(-1);
+    setActive(active.id);
   }
 
-  return { bar: bar, hbar: hbar, line: line, setTheme: setTheme, series: SERIES };
-})(window.d3);
+  function scrollToId(id) {
+    const target = id && document.getElementById(id);
+    if (!target) return;
+    const smooth = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+  }
+
+  function setDrawer(open) {
+    document.body.toggleAttribute("data-contents-open", open);
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const link = list.querySelector("[data-active]") ?? list.querySelector("a");
+      link?.focus({ preventScroll: true });
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a[href^='#']");
+    if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const id = decodeURIComponent(link.getAttribute("href").slice(1));
+    if (id === "top") scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    else scrollToId(id);
+    history.replaceState(null, "", `#${id}`);
+    setDrawer(false);
+  });
+  toggle.addEventListener("click", () => setDrawer(!document.body.hasAttribute("data-contents-open")));
+  $("#scrim").addEventListener("click", () => setDrawer(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.hasAttribute("data-contents-open")) {
+      setDrawer(false);
+      toggle.focus({ preventScroll: true });
+    }
+  });
+
+  let ticking = false;
+  const schedule = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => { ticking = false; spy(); });
+  };
+  addEventListener("scroll", schedule, { passive: true });
+  addEventListener("resize", schedule);
+  if (location.hash) scrollToId(decodeURIComponent(location.hash.slice(1)));
+  spy();
+});
 </script>
-
-<!-- EXAMPLE:BEGIN -->
-<script>
-  // Example charts. Replace with the report's own data.
-  Report.bar("#fig-throughput", [
-    { label: "Mon", value: 212 }, { label: "Tue", value: 231 }, { label: "Wed", value: 224 },
-    { label: "Thu", value: 198 }, { label: "Fri", value: 205 }, { label: "Sat", value: 112 }, { label: "Sun", value: 102 }
-  ], { format: ",.0f", yLabel: "Requests (thousands)", xLabel: "Day of week" });
-
-  var day = function (n) { return new Date(2026, 8, 7 + n); };
-  Report.line("#fig-latency", [
-    { name: "p50", values: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return { x: day(i), y: [41, 40, 42, 44, 45, 43, 42][i] }; }) },
-    { name: "p90", values: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return { x: day(i), y: [98, 101, 97, 121, 124, 120, 118][i] }; }) },
-    { name: "p99", values: [0, 1, 2, 3, 4, 5, 6].map(function (i) { return { x: day(i), y: [171, 174, 173, 190, 188, 186, 184][i] }; }) }
-  ], { format: ",.0f", xFormat: "%a", yLabel: "Latency (ms)", xLabel: "Day (UTC)" });
-</script>
-<!-- EXAMPLE:END -->
 </body>
 </html>

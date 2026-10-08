@@ -1,5 +1,8 @@
 # Report colours are tokens from one validated palette
 
+> Superseded in part by [ADR 0003](0003-reports-share-the-research-reading-style.md):
+> reports are light only and draw charts with Vega-Lite. The token rule stands.
+
 Reports that share a look need the same colours, the same type, and the same
 chart marks in every file, in both light and dark mode. Left to each report,
 colours drift: a chart picks its own hex, dark mode becomes an inverted light

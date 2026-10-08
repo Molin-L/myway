@@ -1,98 +1,79 @@
 # House style
 
-One template, one token block, one look. Every report is a single self-contained HTML file built from `templates/report.html`. The template carries the tokens, the layout, the top bar with the theme toggle, the outline, and the chart runtime. A report author writes sections and data, nothing else.
+One template, one style block, one look. Every report is a single self-contained HTML file built from `templates/report.html`. The style is the reading page of the research workspace (`~/Research/theory/site/index.html`), itself adapted from numbers.sfinterface.com: same token names, same `sf-` class prefix, same components. A report author writes the body and the data, nothing else.
 
 ## What may not change
 
 | Part | Rule |
 |---|---|
-| Token block | The first `<style>` in the file. The only place a colour literal may appear. Do not add, remove, or rename tokens in a report; change the template instead. |
-| Theme mechanism | `data-theme` on `<html>`, set before paint from `localStorage` (`rp-theme`) or the OS preference. The top-bar button toggles it. Do not add a second mechanism. |
-| Top bar | `header.rp-nav`, sticky. It holds the report title, the "Contents" button for narrow screens, and the theme toggle. No section links. |
-| Outline | `nav#rp-outline`, built at load from every `h2`, `h3`, and `h4` inside a `section.rp-section`. Do not hand-write outline entries. See [Outline](#outline). |
-| Chart runtime | `Report.bar`, `Report.hbar`, `Report.line` (see [charts.md](charts.md)). Extend the runtime in the template if a new form is needed; do not paste a one-off D3 snippet with its own colours. |
-| Typeface | System sans (`--font`). No web fonts, no display face, no serif. |
-| Remote resources | D3 from `https://cdn.jsdelivr.net/npm/d3@7` only. For an offline report, save `d3.min.js` next to the file and change the `src`; `report.py lint` accepts either. |
-
-`scripts/report.py lint` enforces these. A colour literal outside the token block is an error, not a warning.
+| Style block | `<style id="sf-style">`, the only place a colour literal may appear. `report.py lint` fails when it differs from the template by a single byte. |
+| Runtime | `<script id="sf-runtime">`: math, footnotes, section numerals, the outline, and the charts. Same rule: identical to the template. |
+| Top bar | `header.sf-topbar`: the file path on the left (the "Contents" button on narrow screens), the brand in the centre (kicker in italic serif over the project name in spaced capitals), the date on the right. No section links. |
+| Outline | `nav#contents`, built at load from the `h2` and `h3` headings in the body plus the Sources list. Never hand-written. |
+| Typeface | Inter (Google Fonts) for text, the system serif stack (Iowan Old Style, Palatino, Georgia) for the title, the brand, numerals, stat values, and dates, the system monospace for paths and code. |
+| Theme | Light only. The background is a flat colour, no grain, no dark mode. |
+| Remote resources | Inter from `fonts.googleapis.com` / `fonts.gstatic.com`; KaTeX, Vega, Vega-Lite, and vega-embed from `cdn.jsdelivr.net/npm/`. Nothing else. |
 
 ## Tokens
 
-Both themes are **selected** values, not an automatic inversion. The values come from the validated dataviz palette: every adjacent categorical pair clears the colour-vision-deficiency (CVD) floor in both modes.
-
 ### Planes and ink
 
-| Token | Role | Light | Dark |
+| Token | Value | Role |
+|---|---|---|
+| `--site-bg` | `#fdfdfc` | page background |
+| `--site-surface` | `#ffffff` | cards, charts, stat cells, code |
+| `--site-fg` | `#1c1c21` | titles, headings, strong text |
+| `--site-prose` | `#2f2f2d` | body text |
+| `--site-muted` | `#6f6f6c` | secondary text, captions, axis labels |
+| `--site-subtle` | `#9a9a96` | numerals, table headers, labels, reference lines |
+| `--site-line` | `rgba(17,17,17,.09)` | hairlines, gridlines, rules |
+| `--site-pill` | `rgba(17,17,17,.05)` | the outline pill, tags, footnote markers |
+| `--site-ring` | two-layer shadow | the ring around every surface |
+
+### Tones
+
+Components that take `data-tone` resolve it to `--tone`:
+
+| Tone | Token | Value | Meaning |
 |---|---|---|---|
-| `--plane` | page background | `#f9f9f7` | `#0d0d0d` |
-| `--surface` | cards, figures, top bar, outline, tooltips | `#fcfcfb` | `#1a1a19` |
-| `--border` | hairline ring | `rgba(11,11,11,.10)` | `rgba(255,255,255,.10)` |
-| `--ink-1` | primary text | `#0b0b0b` | `#ffffff` |
-| `--ink-2` | secondary text, legend, labels | `#52514e` | `#c3c2b7` |
-| `--ink-3` | muted: axis ticks, captions, meta | `#898781` | `#898781` |
-| `--grid` | hairline gridlines | `#e1e0d9` | `#2c2c2a` |
-| `--axis` | baseline, crosshair, reference line | `#c3c2b7` | `#383835` |
-| `--delta-up` | a good change, as text | `#006300` | `#0ca30c` |
-| `--accent` | links, callout rule | `var(--series-1)` | `var(--series-1)` |
+| (none) | `--sf-tone-neutral` | `#6f6f6c` | the default; most blocks |
+| `accent` | `--sf-tone-accent` | `#036ee6` | key idea, current, turning point |
+| `positive` | `--sf-tone-positive` | `#1a7f4b` | recommended, healthy, a good change |
+| `caution` | `--sf-tone-caution` | `#a86400` | risk, degraded, needs a decision |
+| `negative` | `--sf-tone-negative` | `#c4321c` | refuted, blocker, a bad change |
 
-### Categorical series (fixed order)
+Tone is emphasis, never identity: it marks a state, and a word beside it says which.
 
-| Token | Hue | Light | Dark |
-|---|---|---|---|
-| `--series-1` | blue | `#2a78d6` | `#3987e5` |
-| `--series-2` | orange | `#eb6834` | `#d95926` |
-| `--series-3` | aqua | `#1baf7a` | `#199e70` |
-| `--series-4` | yellow | `#eda100` | `#c98500` |
-| `--series-5` | magenta | `#e87ba4` | `#d55181` |
-| `--series-6` | green | `#008300` | `#008300` |
-| `--series-7` | violet | `#4a3aa7` | `#9085e9` |
-| `--series-8` | red | `#e34948` | `#e66767` |
+### Chart series
 
-The order is the safety mechanism. Slot 1 is always the first series, slot 2 the second. Never cycle, never re-sort by value, never skip a slot. A ninth series folds into "Other" or the chart becomes small multiples. For scatter and other all-pairs forms, stop at three series.
-
-### Sequential and diverging
-
-`--seq-1` (lightest, near zero) to `--seq-7` (darkest). One hue, blue. In dark mode the steps reverse so that `--seq-1` is still the step nearest the surface. Diverging: `--series-1` (blue) and `--series-8` (red) as the poles, `--div-mid` as the neutral midpoint.
-
-### Status (reserved)
-
-`--good`, `--warning`, `--serious`, `--critical`. The same values in both modes. Never use a status token as a series colour. Never use a status colour alone: pair it with a label (`.rp-status` does this) or an icon.
+`--sf-series` is the validated categorical palette, in fixed order: blue `#2a78d6`, orange `#eb6834`, aqua `#1baf7a`, yellow `#eda100`, magenta `#e87ba4`, green `#008300`, violet `#4a3aa7`, red `#e34948`. The runtime hands it to Vega-Lite as the category range, so the first series is always blue, the second orange. Never cycle, never re-sort by value, never skip a slot. A ninth series folds into "Other" or the chart splits.
 
 ## Type and rhythm
 
 | Element | Spec |
 |---|---|
-| Body | 16px / 1.55, `--ink-1` |
-| `h1` | 2rem, weight 650 |
-| `h2` | 1.4rem, one per section, a top-level outline entry |
-| `h3` | 1.1rem, a sub-topic inside a section, nested under its `h2` in the outline |
-| `h4` | 1rem, weight 600, a part of a sub-topic, nested under its `h3`. The deepest level; no `h5` or `h6` |
-| Measure | `--measure` = 72rem, the widest the content column gets |
-| Outline | `--outline-w` = 15rem wide, `--gutter` = 2.5rem to the content. The page is centred as one block of outline and content |
-| Radius | `--radius` = 6px on cards, figures, tables, tooltips, the outline |
-| Figures in text | proportional. `tabular-nums` only in table columns and axis ticks |
-
-Text never wears a series colour. Identity comes from a swatch, a dot, or a mark beside the text.
+| Body | Inter 14px / 1.55, `--site-prose`, letter-spacing −0.011em, measure 62ch |
+| Title (`h1.sf-doc-title`) | serif 40px (34px below 760px), weight 400 with a hairline stroke |
+| Kicker (`.sf-doc-group`) | 13px, `--site-subtle`, above the title |
+| Meta line | path in mono, date in italic, author muted |
+| Lede | 16px / 1.6, `--site-fg`, measure 60ch |
+| `h2` | 17px, weight 540, 56px above; a serif roman numeral in front |
+| `h3` | 14.5px, weight 540, 32px above |
+| `h4` | 11px uppercase label, `--site-subtle`; not in the outline |
+| Column | `--site-content` = 644px, centred |
+| Radius | 12px on surfaces, full pills on badges, tags, and the outline pill |
 
 ## Outline
 
-The outline is the report's table of contents. It is a card on the left of the content that stays in view while the page scrolls, and it has its own scroll when the entries do not fit. A top bar cannot hold many topics or show which topic belongs to which; the outline can.
-
 | Behaviour | Rule |
 |---|---|
-| Entries | One per `h2`, `h3`, and `h4` inside a `section.rp-section`, in document order. An `h3` nests under the `h2` before it, an `h4` under the `h3` before it. |
-| Links | The first `h2` of a section links to the section `id`, even if the `h2` has an `id` of its own. Any other heading links to its own `id`. A heading with no `id` gets one from its text at load (`Data sources` becomes `data-sources`), so write a short `id` on each `h3` and `h4` when a link to it must stay stable. |
-| Current entry | The entry for the part the reader is in is marked with an accent rule and `aria-current="location"`. It stays in view inside the outline. After a click on an entry, or on a link to one, that entry stays marked until the reader scrolls, clicks, or presses a key. |
-| Long reports | By default every branch is open. `data-expand="active"` on `nav#rp-outline` opens only the branch the reader is in; use it above about 40 entries. |
-| Narrow screens | Below 64rem the outline leaves the page and becomes a drawer. The "Contents" button in the top bar opens it. A click on an entry, a click outside, `Escape`, or focus that moves to another part of the page closes it. |
-| No headings | The outline and its button hide. The top bar and the content narrow to one centred column of `--measure`. |
-
-## Theme toggle
-
-The button in the top bar (`#rp-toggle`) flips `data-theme` between `light` and `dark` and stores the choice under `rp-theme` in `localStorage`. The bootstrap script in `<head>` reads the stored value before first paint, so the page never flashes. With no stored value the OS preference wins.
-
-Charts need no redraw on a toggle. Every mark sets its colour through `var(--series-n)` or `var(--surface)`, so the browser re-resolves the tokens when `data-theme` changes.
+| Entries | One per `h2` (with its numeral) and `h3` in the body, in document order, then "Sources" when the body has footnotes. |
+| Ids | An author's `id` is kept; otherwise the runtime makes one from the text (`Error budget` becomes `error-budget`). Write a short `id` on an `h3` that others will link to. |
+| Current entry | The last heading above a line just under the top bar; at the end of the page, the last entry. A grey pill slides to it, and the rail scrolls to keep it in view. |
+| Width | Fixed at 186px, 44px right of the column. Long names end in an ellipsis; the full name is the link's title. |
+| Narrow screens | Below 1180px the rail leaves the page and the "Contents" button replaces the path in the top bar. It opens the outline as a drawer from the left; a click on an entry, the scrim, or `Escape` closes it. |
+| No headings | The outline and its button hide. |
 
 ## Print
 
-The top bar and the outline hide; the `h1` carries the title. The content takes the full page width. Figures, tiles, and cards do not break across pages, and a heading stays on the same page as the block after it. The printed theme is whatever the screen showed. Toggle to light before you print.
+The top bar, the outline, and the drawer hide. Figures, equations, cards, callouts, numbered blocks, and timeline entries do not break across pages, and a heading stays with the block after it.

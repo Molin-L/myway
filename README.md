@@ -75,15 +75,17 @@ transport); writes go through `glab api`. One-time setup: the goal group, see
 
 ## Reports
 
-`report` turns results into one self-contained HTML file with a consistent
-look: a floating left outline built from the `h2`–`h4` headings (so many and
-nested topics fit; a drawer on narrow screens), a sticky top bar with a
-light/dark toggle, house tokens for both themes, and D3 charts drawn through
-those tokens so a theme change needs no redraw. The author supplies title,
-sections, and data; `scripts/report.py new` scaffolds the file and
-`scripts/report.py lint` refuses colour literals, a missing outline,
-duplicate ids, missing captions, and unfilled placeholders. The palette and the reasons
-behind it: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md).
+`report` turns results into one self-contained HTML file in the house reading
+style shared with the research workspace: a serif title in a centred column,
+roman-numbered sections, an "On this page" outline on the right built from the
+`h2`/`h3` headings (a drawer on narrow screens), a fixed component vocabulary
+(lede, stats, callouts, timeline, cards, decisions, footnotes), KaTeX math, and
+Vega-Lite charts themed from the tokens. The author writes the body and the
+data; `scripts/report.py new` scaffolds the file and `scripts/report.py lint`
+refuses an edited style or runtime, colours or remote data in chart specs,
+axes without units, unnumbered figures, duplicate ids, and unfilled
+placeholders. The reasons: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md)
+and [ADR 0003](docs/adr/0003-reports-share-the-research-reading-style.md).
 
 ## Install
 

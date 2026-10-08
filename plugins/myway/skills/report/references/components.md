@@ -1,173 +1,200 @@
 # Components
 
-Every block below is plain HTML with house classes. Copy the block, fill the text, keep the class names. Do not add inline styles.
+The report body, between `<!-- BODY:BEGIN -->` and `<!-- BODY:END -->`, is an **HTML fragment**: no `<h1>`, `<style>`, inline `style=""`, or executable `<script>`. The template supplies all styling. Use only the elements and classes below; if the report needs something this list cannot express, use plain prose or a table, and tell the user which component was missing so it can be added to the template.
 
-## Section
+This is the same vocabulary as the research workspace's `components.md`, minus its research-only wiring (review answers, citation checking). `report.py new --with-example` renders every component once.
 
-One `<section>` per top-level outline entry. The `id` is the anchor; the `h2` is the outline label.
+## Page structure
 
-```html
-<section class="rp-section" id="throughput">
-  <h2>Throughput</h2>
-  <p>One paragraph that states the finding first.</p>
-</section>
-```
+- No `<h1>`: the header shows the title.
+- `<h2>` for sections. The page numbers them (I, II, III) and lists them in the outline, so never number headings yourself.
+- `<h3>` for sub-topics, also in the outline. An `<h4>` is a small uppercase label, not in the outline; use it sparingly. No `<h5>`/`<h6>`, and no heading inside a component.
+- Prose: `<p>`, `<ul>`, `<ol>`, `<strong>`, `<em>`, `<a href>`, `<code>`, `<pre>`, `<blockquote>`, `<hr>`, and `<table>` with `<thead>`/`<tbody>` (the page styles tables and wraps code).
+- Escape `&`, `<` and `>` in text as `&amp;`, `&lt;`, `&gt;`, including inside `\( \)` and `\[ \]` math: a bare `<` starts an HTML tag before KaTeX sees it.
 
-## Sub-topics
+## Tones
 
-A section with parts uses `h3` for each part and `h4` for a part of a part. The outline nests them under their section. Give each one a short `id`, unique in the file; the lint fails on a duplicate. Do not skip a level, and stop at `h4`.
+Components that take `data-tone` accept `accent` (blue: key idea, current), `positive` (green: recommended, healthy, good change), `caution` (amber: risk, degraded, needs a decision), `negative` (red: refuted, blocker, bad change). Omit it for neutral. Tone is emphasis, so most blocks should be neutral. The lint rejects any other value.
 
-```html
-<section class="rp-section" id="method">
-  <h2>Method</h2>
-  <h3 id="data-sources">Data sources</h3>
-  <h4 id="source-access-logs">Gateway access logs</h4>
-  <p>…</p>
-  <h4 id="source-metrics">Gateway metrics</h4>
-  <p>…</p>
-  <h3 id="limits">Limits</h3>
-  <p>…</p>
-</section>
-```
-
-The outline shows this as:
-
-```text
-Method
-  Data sources
-    Gateway access logs
-    Gateway metrics
-  Limits
-```
-
-A heading inside any block of the section is an outline entry too (for example the `h3` of a [card](#card)). If a heading must not show in the outline, make it a bold paragraph instead.
-
-## Outline
-
-Already in the template. Do not write entries; the runtime builds them from the headings. The one setting is on the container:
+## Lede and stats: the opening
 
 ```html
-<nav class="rp-outline" id="rp-outline" aria-label="Contents" data-expand="active">
-```
-
-`data-expand="active"` opens only the branch the reader is in. Use it when the outline has more than about 40 entries. Without it every branch is open.
-
-## Stat tiles
-
-A row of headline numbers. Three to five tiles. The delta names the period it compares against. `is-up` means a good change, `is-down` a bad one, whichever direction the number moved.
-
-```html
-<div class="rp-tiles">
-  <div class="rp-tile">
-    <div class="rp-tile__label">Requests served</div>
-    <div class="rp-tile__value">1.28M</div>
-    <div class="rp-tile__delta is-up">+4.2% vs last week</div>
-  </div>
+<p class="sf-lede">One paragraph that tells the reader what this report concludes.</p>
+<div class="sf-stats">
+  <p class="sf-stat"><span class="sf-stat-value">1.28M</span><span class="sf-stat-label">requests served</span><span class="sf-stat-delta" data-tone="positive">+4.2% vs last week</span></p>
+  <p class="sf-stat"><span class="sf-stat-value">184 ms</span><span class="sf-stat-label">p99 latency</span><span class="sf-stat-delta" data-tone="negative">+11 ms vs last week</span></p>
 </div>
 ```
 
-Compact the value by hand: `1,284` / `12.9K` / `$4.2M`.
+Three to five stats, each a number the report backs. Compact values by hand (`1,284` / `12.9K` / `$4.2M`) and keep the unit in the value. `sf-stat-delta` is optional; it names the period it compares against, and its tone says whether the change is good (`positive`) or bad (`negative`), whichever way the number moved. A delta with no tone reads as neutral (`no change`).
 
-## Hero figure
-
-The one number a report leads with. At most one per report.
+## Callout: a key finding, caveat, or risk
 
 ```html
-<div class="rp-tile__label">Monthly recurring revenue</div>
-<div class="rp-hero">$412K</div>
-<div class="rp-tile__delta is-up">+6.1% vs August</div>
+<aside class="sf-callout" data-tone="caution">
+  <p class="sf-label">Regression</p>
+  <p>The p99 rose by 11 ms after the Thursday deploy.</p>
+</aside>
 ```
 
-## Figure (chart holder)
-
-A chart lives in a figure with an `id`. The title states the finding, the sub states the quantity, the unit, the window, and the sample, and the caption starts with the figure number and names the source. The runtime inserts the legend and the SVG between the sub and the caption. The full list of required parts is in [charts.md](charts.md#figure-requirements).
+## Badge and tags
 
 ```html
-<figure class="rp-figure" id="fig-requests">
-  <p class="rp-figure__title">Weekend traffic is half the weekday level</p>
-  <p class="rp-figure__sub">Requests per day, thousands. 2026-09-07 to 2026-09-13, UTC. n = 7 days.</p>
-  <figcaption>Figure 1. Source: gateway access logs, aggregated per calendar day.</figcaption>
-</figure>
+<span class="sf-badge" data-tone="positive">healthy</span>
+<ul class="sf-tags"><li>deploy</li><li>latency</li></ul>
 ```
 
-Then, in the data script at the end of the body. The axis titles carry the unit; the lint warns when they are missing:
-
-```html
-<script>
-  Report.bar("#fig-requests", [{ label: "Mon", value: 212 }, { label: "Tue", value: 231 }],
-    { format: ",.0f", yLabel: "Requests (thousands)", xLabel: "Day of week" });
-</script>
-```
-
-Two figures side by side:
-
-```html
-<div class="rp-cols">
-  <figure class="rp-figure" id="fig-a">…</figure>
-  <figure class="rp-figure" id="fig-b">…</figure>
-</div>
-```
+A badge is a short status word, the house status pill: colour plus a word, never colour alone. Tags classify a card.
 
 ## Table
 
-Numbers right-aligned with `class="num"`. A table is also the accessible fallback for a chart, so every chart with more than a handful of points should have one nearby or in an appendix.
-
 ```html
-<table class="rp-table">
-  <thead><tr><th>Service</th><th>Status</th><th class="num">Requests</th></tr></thead>
+<table>
+  <thead><tr><th>Service</th><th>Status</th><th class="num">Requests</th><th class="num">p99 (ms)</th></tr></thead>
   <tbody>
-    <tr><td>gateway</td><td><span class="rp-status is-good">healthy</span></td><td class="num">1,284,001</td></tr>
+    <tr><td>gateway</td><td><span class="sf-badge" data-tone="positive">healthy</span></td><td class="num">1,284,001</td><td class="num">184</td></tr>
   </tbody>
 </table>
 ```
 
-## Status pill
+`class="num"` right-aligns a numeric column with tabular figures; put it on the `th` and every `td` of the column. The unit goes in the header. A table is also the accessible fallback for a chart.
 
-Colour plus a word, never colour alone. Variants: `is-good`, `is-warning`, `is-serious`, `is-critical`, or none for neutral.
+## Timeline: dated history
 
 ```html
-<span class="rp-status is-warning">degraded</span>
+<ol class="sf-timeline">
+  <li data-tone="accent">
+    <time>Thu</time>
+    <div>
+      <p><strong>Feed adapter 4.2 deployed</strong></p>
+      <p>One or two sentences: what changed, and why it mattered.</p>
+    </div>
+  </li>
+</ol>
 ```
 
-## Callout
+Oldest first. Put `data-tone="accent"` on the few turning points only.
 
-For the finding that needs a box. Variants: default (accent rule), `is-good`, `is-warning`, `is-critical`.
+## Cards
 
 ```html
-<div class="rp-callout is-warning">
-  <p class="rp-callout__title">Latency regressed after the Thursday deploy</p>
-  <p>The p99 rose by 11 ms. The cause is the new retry policy. A fix is in review.</p>
+<div class="sf-cards">
+  <article class="sf-card">
+    <p class="sf-card-title">Retry budget fix</p>
+    <p>One or two sentences.</p>
+    <ul class="sf-tags"><li>fix</li></ul>
+  </article>
 </div>
 ```
 
-## Key–value list
-
-Metadata: window, environment, version, owner.
+Cards always sit inside `sf-cards` (a two-column grid). For a paper or other published work, use the paper card:
 
 ```html
-<dl class="rp-kv">
-  <dt>Window</dt><dd>2026-09-08 to 2026-09-14</dd>
-  <dt>Environment</dt><dd>production, eu-west-1</dd>
-</dl>
+<article class="sf-paper">
+  <p class="sf-paper-meta"><span>2011</span><span>Tóth, Lemperière, Deremble et al.</span></p>
+  <p class="sf-paper-title"><a href="https://arxiv.org/abs/1105.1694">Full title</a></p>
+  <p class="sf-paper-venue">Venue</p>
+  <p>Its contribution in one or two sentences.</p>
+</article>
 ```
 
-## Card
-
-A generic surface for prose that should sit apart from the flow.
+## Facts: key/value pairs
 
 ```html
-<div class="rp-card">
-  <h3>Method</h3>
-  <p>…</p>
+<dl class="sf-facts"><dt>Window</dt><dd>2026-09-07 to 2026-09-13, UTC</dd><dt>Environment</dt><dd>production, eu-west-1</dd></dl>
+```
+
+For metadata (window, environment, version, owner), on its own or inside a card or numbered block.
+
+## Equation
+
+```html
+<figure class="sf-equation" data-label="1">
+  \[ B = (1 - o)\,N \]
+  <figcaption>\(o\): the availability objective; \(N\): requests in the window.</figcaption>
+</figure>
+```
+
+Math is KaTeX: `\[ ... \]` for display and `\( ... \)` inline, anywhere in the body. Never `$`, since prices use it. `data-label` and `<figcaption>` are optional.
+
+## Figure and chart
+
+```html
+<figure class="sf-figure" id="fig-requests">
+  <div class="sf-chart"><script type="application/json">
+  {"data": {"values": [{"day": "Mon", "requests": 212}, {"day": "Tue", "requests": 231}]},
+   "mark": "bar",
+   "encoding": {
+     "x": {"field": "day", "type": "ordinal", "sort": null, "title": "Day of week (UTC)"},
+     "y": {"field": "requests", "type": "quantitative", "title": "Requests (thousands)"}}}
+  </script></div>
+  <figcaption><strong>Figure 1.</strong> Weekend traffic is half the weekday level. Requests per day, 2026-09-07 to 2026-09-13, UTC; n = 7 days. Data: gateway access logs.</figcaption>
+</figure>
+```
+
+The spec is Vega-Lite v5 JSON; [charts.md](charts.md) has the rules. An image or inline `<svg>` can go in `sf-figure` instead of a chart, with the same caption. Two charts never share a figure.
+
+## Quotation: a source's exact words
+
+```html
+<blockquote class="sf-quote"><p>Exact words from the source.</p><cite>Incident review 2026-09-12, §4</cite></blockquote>
+```
+
+Inline, use `<q>exact words</q>`. Never paraphrase inside either; use `...` for an omission.
+
+## Meter: a 0–5 score
+
+```html
+<span class="sf-meter" data-value="4" aria-label="4 of 5"></span>
+```
+
+Mainly in table cells. Always keep the `aria-label`.
+
+## Steps: a plan
+
+```html
+<ol class="sf-steps">
+  <li data-state="done"><p class="sf-step-title">Find the cause</p><p>What it produced.</p></li>
+  <li data-state="current"><p class="sf-step-title">Ship the fix</p><p>Where it stands.</p></li>
+  <li><p class="sf-step-title">Confirm recovery</p><p>What done means.</p></li>
+  <li data-state="skip"><p class="sf-step-title">Backfill</p><p>Why it is skipped.</p></li>
+</ol>
+```
+
+`data-state` is `done`, `current`, `next` (or omitted), or `skip`.
+
+## Numbered blocks: question, hypothesis, decision
+
+A question to answer, a claim with its test, or a choice for the reader. Each has an `id` and an `sf-id` label.
+
+```html
+<div class="sf-hypothesis" id="h1">
+  <p class="sf-head"><span class="sf-id">H1</span>The claim, stated so it can fail.</p>
+  <dl class="sf-facts"><dt>Test</dt><dd>…</dd><dt>Pass if</dt><dd>…</dd><dt>Fail if</dt><dd>…</dd></dl>
+</div>
+
+<div class="sf-decision" id="d1">
+  <p class="sf-head"><span class="sf-id">D1</span>The question for the reader?</p>
+  <p>What depends on this choice.</p>
+  <ul class="sf-options">
+    <li data-recommended><strong>Option A</strong>: consequence.</li>
+    <li><strong>Option B</strong>: consequence.</li>
+  </ul>
 </div>
 ```
 
-## Code
+Questions are `<ol class="sf-questions">` of `<li class="sf-question" id="q1">` with the same `sf-head` and an optional badge at the end of the head. In a decision, mark at most one option `data-recommended` (the lint fails on two). For a decision already taken, mark the chosen option `data-chosen` and end it with `<span class="sf-badge" data-tone="accent">Chosen</span>`.
+
+## Footnotes
+
+Cite with `[^n]` in the text; the page turns each marker into a link. End the body with:
 
 ```html
-<pre><code>glab api projects/42/pipelines</code></pre>
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><a href="URL">Title</a></li>
+</ol>
+</section>
 ```
 
-## Footer
-
-Already in the template. It repeats the date and author. Add a link to the source data or the repo if one exists.
+Items are numbered by position, so item `n` must have `id="fn{n}"` and appear in order. The page heads the list "Sources" and adds it to the outline. The lint fails on a marker with no item and warns on an item never cited.
