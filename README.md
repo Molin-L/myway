@@ -86,9 +86,12 @@ file, so a report opens offline and in a private network. The author writes the
 body and the data; `scripts/report.py new` scaffolds the file, `bundle` inlines the libraries the
 body needs, and `lint` refuses an edited style or runtime, any remote resource, colours or remote data in chart specs,
 axes without units, unnumbered figures, duplicate ids, and unfilled
-placeholders. The reasons: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md)
-[ADR 0003](docs/adr/0003-reports-share-the-research-reading-style.md), and
-[ADR 0004](docs/adr/0004-reports-load-nothing-from-the-network.md).
+placeholders. Every claim stands on a fact with a checkable source, and the
+prose is plain: `lint` also warns on a stat no section backs and on
+machine-prose tells. The reasons: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md)
+[ADR 0003](docs/adr/0003-reports-share-the-research-reading-style.md),
+[ADR 0004](docs/adr/0004-reports-load-nothing-from-the-network.md), and
+[ADR 0005](docs/adr/0005-report-claims-stand-on-facts.md).
 
 ## Install
 

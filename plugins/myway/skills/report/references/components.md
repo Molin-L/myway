@@ -26,7 +26,7 @@ Components that take `data-tone` accept `accent` (blue: key idea, current), `pos
 </div>
 ```
 
-Three to five stats, each a number the report backs. Compact values by hand (`1,284` / `12.9K` / `$4.2M`) and keep the unit in the value. `sf-stat-delta` is optional; it names the period it compares against, and its tone says whether the change is good (`positive`) or bad (`negative`), whichever way the number moved. A delta with no tone reads as neutral (`no change`).
+Three to five stats, each a number the report backs: the same number appears again lower in the page, in a section, table, figure, or footnote that shows its source (the lint warns otherwise; a compacted `1.28M` is backed by `1,284,001`). Compact values by hand (`1,284` / `12.9K` / `$4.2M`) and keep the unit in the value. `sf-stat-delta` is optional; it names the period it compares against, and its tone says whether the change is good (`positive`) or bad (`negative`), whichever way the number moved. A delta with no tone reads as neutral (`no change`).
 
 ## Callout: a key finding, caveat, or risk
 

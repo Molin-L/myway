@@ -18,7 +18,10 @@ Subcommands:
 
   lint FILE.html
       Check that FILE.html still follows the house style. Exit 1 on any
-      error. Warnings do not change the exit code.
+      error. Warnings do not change the exit code. Warnings include the
+      prose rules of references/writing.md (machine-prose words, filler,
+      vague attributions, em dashes, title-case headings) and stats whose
+      number appears nowhere else in the body.
 
   tokens
       Print the token names the template defines (for reference).
@@ -28,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import bisect
 import datetime as dt
 import html
 import json
@@ -276,6 +280,9 @@ class Body(HTMLParser):
         self.skip_text = 0
         self.ref_text: list[str] = []                    # prose a forge reference could link from
         self.noref: list[str] = []                       # open tags that stop reference linking (a, data-noref)
+        self.prose: list[tuple[int, str]] = []           # (line, text) the author wrote: no code, quotes, or sources
+        self.stat_values: list[list] = []                # [line, [text]] per span.sf-stat-value
+        self.backing: list[str] = []                     # everything outside the stat row, chart data included
 
     def line(self) -> int:
         return self.base + self.getpos()[0]
@@ -284,6 +291,7 @@ class Body(HTMLParser):
         a = dict(attrs)
         cls = (a.get("class") or "").split()
         ln = self.line()
+        self.backing.append(" ")                         # so "1,284" and "184" in adjacent cells stay two numbers
         if a.get("id"):
             self.ids.append((a["id"], ln))
         if "style" in a:
@@ -327,10 +335,13 @@ class Body(HTMLParser):
             self.footnote_ids.append((a.get("id") or "", ln))
         if tag == "a" or "data-noref" in a:
             self.noref.append(tag)
+        if "sf-stat-value" in cls:
+            self.stat_values.append([ln, []])
         if tag not in self.VOID:
             self.stack.append((tag, cls))
 
     def handle_endtag(self, tag: str) -> None:
+        self.backing.append(" ")
         if tag == "script":
             if self.chart is not None:
                 self.chart["text"] = "".join(self.chart["text"])
@@ -363,7 +374,14 @@ class Body(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self.chart is not None:
             self.chart["text"].append(data)
+            self.backing.append(data)
             return
+        if self.stack and "sf-stat-value" in self.stack[-1][1] and self.stat_values:
+            self.stat_values[-1][1].append(data)
+        if not any("sf-stats" in c for _, c in self.stack):
+            self.backing.append(data)
+        if not self.skip_text and not self.in_footnotes and not any(t in ("q", "blockquote", "cite") for t, _ in self.stack):
+            self.prose.append((self.line(), data))
         if self.heading:
             self.heading[2].append(data)
         if self.caption is not None:
@@ -549,6 +567,8 @@ def lint_body(text: str, refs: dict, L: Lint) -> None:
             L.warn(f"line {ln}: <h4> is not in the outline; prefer an h3, or a bold lead-in")
         if level in (2, 3) and re.match(r"^\s*(?:[IVXLC]+|\d+(?:\.\d+)*)[.)]\s", words):
             L.warn(f"line {ln}: heading \"{words}\" is numbered by hand; the page numbers sections")
+        if level in (2, 3) and title_case(words):
+            L.warn(f"line {ln}: heading \"{words}\" is in title case; use sentence case")
         if level == 2:
             prev = 2
         elif level == 3:
@@ -613,6 +633,103 @@ def lint_body(text: str, refs: dict, L: Lint) -> None:
     unused = [i for i in range(1, len(items) + 1) if i not in refs]
     if unused:
         L.warn(f"footnote item(s) {', '.join(map(str, unused))} are never cited with [^n]")
+
+    lint_stats(b, L)
+    lint_prose(b, L)
+
+
+# ---- prose (references/writing.md)
+
+def _words(*ws: str) -> str:
+    return r"\b(?:" + "|".join(ws) + r")\b"
+
+
+PROSE_RULES: list[tuple[str, str]] = [
+    (_words("additionally", "crucial(?:ly)?", "delv(?:e|es|ed|ing)", "enduring", "enhanc(?:e|es|ed|ing)",
+            "foster(?:s|ed|ing)?", "garner(?:s|ed)?", "interplay", "intricate", "pivotal", "robust(?:ly)?",
+            "seamless(?:ly)?", "showcas(?:e|es|ed|ing)", "tapestry", "testament", "underscor(?:e|es|ed|ing)", "vibrant"),
+     "machine-prose word; use a plainer word or cut it"),
+    (_words("utiliz(?:e|es|ed|ing)", "utilis(?:e|es|ed|ing)", "leverag(?:e|es|ed|ing)", "facilitat(?:e|es|ed|ing)",
+            "numerous", "in order to", "due to the fact that", "in the event that"),
+     "plain word exists (use, help, many, to, because, if)"),
+    (_words("it is (?:important|worth) (?:to note|noting) that", "it should be noted that", "it's worth noting that",
+            "needless to say"),
+     "filler; delete it and start with the point"),
+    (_words("serves as", "stands as", "boasts"),
+     "a fancy \"is\"; write is or has"),
+    (_words("experts (?:say|agree|believe)", "studies (?:show|suggest)", "research (?:shows|suggests)",
+            "industry reports", "some (?:critics|people) (?:argue|say)", "it is widely (?:known|accepted|believed)",
+            "many believe"),
+     "vague attribution; cite the source with [^n] or cut the claim"),
+    (r"\bnot (?:just|only|merely)\b[^.]{0,80}?,? but\b",
+     "\"not just X, but Y\"; state Y"),
+    (_words("landscape", "paradigm", "north star", "flywheel", "substrate", "synergy", "game[- ]changer", "holistic"),
+     "abstract metaphor; name the concrete thing"),
+    (_words("i hope this helps", "let me know if", "great question", "certainly!?", "of course!"),
+     "chatbot phrase; a report does not talk to the reader"),
+    (_words("the future looks bright", "only time will tell", "exciting times"),
+     "generic conclusion; state the next step and its date"),
+    (_words("could potentially", "might potentially", "may potentially", "possibly could"),
+     "stacked hedge; state the fact, or say once what is unknown"),
+    (r"\u2014", "em dash; end the sentence or use a comma"),
+]
+PROSE_RES = [(re.compile(p, re.I), msg) for p, msg in PROSE_RULES]
+SMALL_WORDS = {"a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into", "of", "on", "or", "per",
+               "the", "to", "vs", "via", "with"}
+
+
+def title_case(heading: str) -> bool:
+    """True when every word after the first is capitalised, the way a title-case heading is."""
+    words = [w for w in re.findall(r"[A-Za-z][\w'-]*", heading)][1:]
+    words = [w for w in words if w.lower() not in SMALL_WORDS and not w.isupper()]
+    return len(words) >= 2 and all(w[0].isupper() for w in words)
+
+
+def lint_prose(b: "Body", L: Lint) -> None:
+    starts, pos, parts = [], 0, []
+    for ln, data in b.prose:
+        starts.append((pos, ln, data))
+        parts.append(data)
+        pos += len(data)
+    text = "".join(parts)
+    found: dict[tuple[str, str], list[int]] = {}
+    for rx, msg in PROSE_RES:
+        for m in rx.finditer(text):
+            i = bisect.bisect_right([s for s, _, _ in starts], m.start()) - 1
+            s0, ln, data = starts[i]
+            ln += data[: m.start() - s0].count("\n")
+            term = "\u2014" if m.group(0) == "\u2014" else " ".join(m.group(0).lower().split())
+            found.setdefault((msg, term), []).append(ln)
+    for (msg, term), lines in found.items():
+        where = ", ".join(map(str, sorted(set(lines))[:6])) + (" …" if len(set(lines)) > 6 else "")
+        L.warn(f"line {where}: \"{term}\": {msg}")
+
+
+NUM_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
+SCALE = {"k": 1e3, "m": 1e6, "b": 1e9, "bn": 1e9, "t": 1e12}
+
+
+def stat_backed(value: str, corpus_numbers: list[float]) -> bool:
+    """True when the stat's number appears elsewhere: as written, or as a full figure that rounds to it."""
+    m = re.search(r"(\d[\d,]*(?:\.(\d+))?)\s*(bn|[kmbt])?\b", value, re.I)
+    if not m:
+        return True                      # a word, not a number: nothing to back
+    x = float(m.group(1).replace(",", ""))
+    places = len(m.group(2) or "")
+    scale = SCALE.get((m.group(3) or "").lower(), 1)
+    for n in corpus_numbers:
+        if n == x or (scale != 1 and round(n / scale, places) == x):
+            return True
+    return False
+
+
+def lint_stats(b: "Body", L: Lint) -> None:
+    corpus = [float(t.replace(",", "")) for t in NUM_RE.findall("".join(b.backing))]
+    for ln, parts in b.stat_values:
+        value = " ".join("".join(parts).split())
+        if not stat_backed(value, corpus):
+            L.warn(f"line {ln}: stat \"{value}\" is not backed: no section, table, figure, or footnote repeats the number "
+                   "(the opening carries only claims the page shows; see references/writing.md)")
 
 
 def cmd_lint(a: argparse.Namespace) -> int:
