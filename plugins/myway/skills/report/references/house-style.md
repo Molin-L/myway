@@ -10,9 +10,11 @@ One template, one style block, one look. Every report is a single self-contained
 | Runtime | `<script id="sf-runtime">`: math, footnotes, section numerals, the outline, and the charts. Same rule: identical to the template. |
 | Top bar | `header.sf-topbar`: the file path on the left (the "Contents" button on narrow screens), the brand in the centre (kicker in italic serif over the project name in spaced capitals), the date on the right. No section links. |
 | Outline | `nav#contents`, built at load from the `h2` and `h3` headings in the body plus the Sources list. Never hand-written. |
-| Typeface | Inter (Google Fonts) for text, the system serif stack (Iowan Old Style, Palatino, Georgia) for the title, the brand, numerals, stat values, and dates, the system monospace for paths and code. |
+| Typeface | Inter (vendored, latin subset, variable weight and optical size) for text, the system serif stack (Iowan Old Style, Palatino, Georgia) for the title, the brand, numerals, stat values, and dates, the system monospace for paths and code. |
 | Theme | Light only. The background is a flat colour, no grain, no dark mode. |
-| Remote resources | Inter from `fonts.googleapis.com` / `fonts.gstatic.com`; KaTeX, Vega, Vega-Lite, and vega-embed from `cdn.jsdelivr.net/npm/`. Nothing else. |
+| Remote resources | None. Inter, KaTeX, and Vega are vendored in `vendor/` and inlined by `report.py bundle` into the VENDOR region in `<head>`, so a report opens offline and in a private network. The lint fails on any remote `src` or `href` in a script, link, image, iframe, or source. |
+| Vendor region | Between `<!-- VENDOR:BEGIN -->` and `<!-- VENDOR:END -->`, written only by `bundle`: the Inter `@font-face` rules always, KaTeX (stylesheet with woff2 fonts as data URIs, and scripts) when the body has math, Vega when it has charts. The lint fails when it does not match what the body needs. |
+| Reference config | `<meta name="sf-refs">`, a JSON object written by `new`: the default `project` and one link template per sigil (`#`, `!`, `~`) with `{project}` and `{id}`. The one part of the head a report may edit by hand, to point references elsewhere. |
 
 ## Tokens
 

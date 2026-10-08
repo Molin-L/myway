@@ -1,6 +1,6 @@
 # Charts
 
-A chart is a Vega-Lite v5 spec, written as JSON inside the body. The runtime loads Vega from the CDN only when the page has a chart, draws each spec with `vega-embed` at the column's width and 240px high (a spec may set `height`), and themes it from the tokens: Inter, muted axes, hairline grid with no vertical lines, the series palette in fixed order, a legend on top, tooltips on every mark, 2px lines, rounded bar ends, and dashed muted reference lines.
+A chart is a Vega-Lite v5 spec, written as JSON inside the body. `report.py bundle` inlines Vega, Vega-Lite, and vega-embed from `vendor/` when the body has a chart (nothing loads from a CDN), and the runtime draws each spec with `vega-embed` at the column's width and 240px high (a spec may set `height`), and themes it from the tokens: Inter, muted axes, hairline grid with no vertical lines, the series palette in fixed order, a legend on top, tooltips on every mark, 2px lines, rounded bar ends, and dashed muted reference lines.
 
 ```html
 <figure class="sf-figure" id="fig-latency">

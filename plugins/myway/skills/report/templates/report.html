@@ -6,13 +6,8 @@
 <title>{{TITLE}}</title>
 <meta name="author" content="{{AUTHOR}}">
 <meta name="date" content="{{DATE}}">
+<meta name="sf-refs" content="{{REFS}}">
 <!-- Layout and styling adapted from https://numbers.sfinterface.com, by way of the ~/Research/theory reading page -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
 <style id="sf-style">
 /* House style. This block is the only place a colour literal may appear, and a report never edits it:
    `report.py lint` fails when it differs from the template. */
@@ -606,6 +601,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .sf-figure, .sf-equation, .sf-stats, .sf-callout, .sf-card, .sf-paper, .sf-question, .sf-hypothesis, .sf-decision, .sf-timeline > li { break-inside: avoid; }
 }
 </style>
+<!-- VENDOR:BEGIN -->
+<!-- VENDOR:END -->
 </head>
 <body>
 <header class="sf-topbar">
@@ -713,7 +710,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <time>Thu</time>
     <div>
       <p><strong>Feed adapter 4.2 deployed</strong></p>
-      <p>Introduced exponential retry on upstream timeouts; the p99 step starts here.</p>
+      <p>Introduced exponential retry on upstream timeouts (!482); the p99 step starts here.</p>
     </div>
   </li>
 </ol>
@@ -726,7 +723,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   </article>
   <article class="sf-card">
     <p class="sf-card-title">Retry budget fix</p>
-    <p>Caps retries at 10% of calls per minute. In review.</p>
+    <p>Caps retries at 10% of calls per minute. In review as !497, tracked in #1311.</p>
     <ul class="sf-tags"><li>fix</li></ul>
   </article>
 </div>
@@ -750,8 +747,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 <ol class="sf-steps">
   <li data-state="done"><p class="sf-step-title">Find the cause</p><p>Bisected to the retry policy in feed adapter 4.2.</p></li>
-  <li data-state="current"><p class="sf-step-title">Ship the retry budget</p><p>In review; expected Tuesday.</p></li>
-  <li><p class="sf-step-title">Confirm recovery</p><p>p99 back under 180 ms for three days.</p></li>
+  <li data-state="current"><p class="sf-step-title">Ship the retry budget</p><p>In review (!497); expected Tuesday.</p></li>
+  <li><p class="sf-step-title">Confirm recovery</p><p>p99 back under 180 ms for three days (~88, and platform/infra#204 for the alert).</p></li>
 </ol>
 
 <div class="sf-decision" id="d1">
@@ -787,7 +784,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 </footer>
 
 <script id="sf-runtime">
-// Report runtime: numbered sections, the outline, footnotes, math, and Vega-Lite charts themed from the tokens.
+// Report runtime: numbered sections, the outline, footnotes, forge references, math, and Vega-Lite charts themed
+// from the tokens. KaTeX and Vega are inlined above by `report.py bundle`; nothing loads from the network.
 // A report never edits this script: `report.py lint` fails when it differs from the template.
 document.addEventListener("DOMContentLoaded", () => {
   const $ = (sel) => document.querySelector(sel);
@@ -857,6 +855,46 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   })();
 
+  // #12, !34, ~56 (and group/project#12) become links to the forge, from <meta name="sf-refs">:
+  // {"project": "group/repo", "#": "https://host/{project}/-/issues/{id}", "!": …, "~": …}.
+  (function linkRefs() {
+    let refs;
+    try {
+      refs = JSON.parse(document.querySelector("meta[name='sf-refs']")?.content || "{}");
+    } catch {
+      return;
+    }
+    const sigils = ["#", "!", "~"].filter((s) => typeof refs[s] === "string");
+    if (!sigils.length) return;
+    const pattern = new RegExp(`(^|[\\s(\\[{,;:])((?:[\\w.-]+(?:/[\\w.-]+)+)?)([${sigils.join("")}])(\\d+)(?![\\w-])`, "g");
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => node.parentElement.closest("script, code, pre, a, .katex, [data-noref]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes = [];
+    while (walker.nextNode()) {
+      pattern.lastIndex = 0;
+      if (pattern.test(walker.currentNode.nodeValue)) nodes.push(walker.currentNode);
+    }
+    for (const node of nodes) {
+      const text = node.nodeValue;
+      const frag = document.createDocumentFragment();
+      let last = 0;
+      for (const m of text.matchAll(pattern)) {
+        const [whole, lead, project, sigil, id] = m;
+        const start = m.index + lead.length;
+        frag.append(text.slice(last, start));
+        const a = el("a", "sf-ref", `${project}${sigil}${id}`);
+        a.href = refs[sigil].replaceAll("{project}", project || refs.project || "").replaceAll("{id}", id);
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        frag.append(a);
+        last = m.index + whole.length;
+      }
+      frag.append(text.slice(last));
+      node.replaceWith(frag);
+    }
+  })();
+
   // Sections: h2 gets a roman numeral, h2 and h3 get an id (the author's, or one from the text).
   (function decorate() {
     const used = new Set([...document.querySelectorAll("[id]")].map((node) => node.id));
@@ -921,33 +959,26 @@ document.addEventListener("DOMContentLoaded", () => {
   (function renderCharts() {
     const charts = [...body.querySelectorAll(".sf-chart")];
     if (!charts.length) return;
-    const urls = [
-      "https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js",
-      "https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js",
-      "https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js",
-    ];
-    const ready = urls.reduce((chain, src) => chain.then(() => new Promise((resolve, reject) => {
-      const script = Object.assign(document.createElement("script"), { src, onload: resolve, onerror: reject });
-      document.head.append(script);
-    })), Promise.resolve());
-    ready.then(() => {
-      const config = chartConfig();
-      for (const chart of charts) {
-        let spec;
-        try {
-          spec = JSON.parse(chart.querySelector("script[type='application/json']")?.textContent ?? "");
-        } catch (err) {
-          chart.replaceChildren(el("p", "sf-chart-error", `Chart spec is not valid JSON: ${err.message}`));
-          continue;
-        }
-        const target = el("div");
-        chart.append(target);
-        const label = chart.closest("figure")?.querySelector("figcaption")?.textContent.trim();
-        window.vegaEmbed(target, { width: "container", height: 240, ...spec }, { actions: false, renderer: "svg", config })
-          .then(() => { if (label) target.querySelector("svg")?.setAttribute("aria-label", label); })
-          .catch((err) => chart.replaceChildren(el("p", "sf-chart-error", `Chart failed: ${err.message}`)));
+    if (!window.vegaEmbed) {
+      charts.forEach((chart) => chart.append(el("p", "sf-chart-error", "The chart library is not bundled: run report.py bundle on this file.")));
+      return;
+    }
+    const config = chartConfig();
+    for (const chart of charts) {
+      let spec;
+      try {
+        spec = JSON.parse(chart.querySelector("script[type='application/json']")?.textContent ?? "");
+      } catch (err) {
+        chart.replaceChildren(el("p", "sf-chart-error", `Chart spec is not valid JSON: ${err.message}`));
+        continue;
       }
-    }, () => charts.forEach((chart) => chart.append(el("p", "sf-chart-error", "Could not load the chart library."))));
+      const target = el("div");
+      chart.append(target);
+      const label = chart.closest("figure")?.querySelector("figcaption")?.textContent.trim();
+      window.vegaEmbed(target, { width: "container", height: 240, ...spec }, { actions: false, renderer: "svg", config })
+        .then(() => { if (label) target.querySelector("svg")?.setAttribute("aria-label", label); })
+        .catch((err) => chart.replaceChildren(el("p", "sf-chart-error", `Chart failed: ${err.message}`)));
+    }
   })();
 
   // Outline: one entry per h2 (with its numeral) and h3, plus the sources list.

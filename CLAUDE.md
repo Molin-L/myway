@@ -20,8 +20,9 @@ everything else is a symlink; never duplicate skill content.
 - `plugins/myway/` — the plugin; register new skills in
   `.claude-plugin/plugin.json` (`skills` array).
 - `plugins/myway/skills/<name>/` — one skill each: `SKILL.md` +
-  `references/` + optional `templates/` and `scripts/` (scripts committed
-  executable).
+  `references/` + optional `templates/`, `scripts/` (scripts committed
+  executable), and `vendor/` (third-party files at pinned versions, fetched
+  by a script in `scripts/`, never edited by hand).
 - `plugins/myway/commands/<name>.md` — thin slash commands only, for a skill
   that exposes more than one entry point (e.g. `/weekly-goal-gap`). A command
   file just points at a `references/*.md` inside the skill; the arc itself

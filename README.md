@@ -79,13 +79,16 @@ transport); writes go through `glab api`. One-time setup: the goal group, see
 style shared with the research workspace: a serif title in a centred column,
 roman-numbered sections, an "On this page" outline on the right built from the
 `h2`/`h3` headings (a drawer on narrow screens), a fixed component vocabulary
-(lede, stats, callouts, timeline, cards, decisions, footnotes), KaTeX math, and
-Vega-Lite charts themed from the tokens. The author writes the body and the
-data; `scripts/report.py new` scaffolds the file and `scripts/report.py lint`
-refuses an edited style or runtime, colours or remote data in chart specs,
+(lede, stats, callouts, timeline, cards, decisions, footnotes), KaTeX math,
+Vega-Lite charts themed from the tokens, and `#12` / `!34` / `~56` references
+linked to the forge. Inter, KaTeX, and Vega are vendored and inlined into the
+file, so a report opens offline and in a private network. The author writes the
+body and the data; `scripts/report.py new` scaffolds the file, `bundle` inlines the libraries the
+body needs, and `lint` refuses an edited style or runtime, any remote resource, colours or remote data in chart specs,
 axes without units, unnumbered figures, duplicate ids, and unfilled
 placeholders. The reasons: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md)
-and [ADR 0003](docs/adr/0003-reports-share-the-research-reading-style.md).
+[ADR 0003](docs/adr/0003-reports-share-the-research-reading-style.md), and
+[ADR 0004](docs/adr/0004-reports-load-nothing-from-the-network.md).
 
 ## Install
 

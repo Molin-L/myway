@@ -3,10 +3,18 @@
 
 Subcommands:
   new OUT.html --title T [--kicker K] [--project P] [--author A]
-               [--date YYYY-MM-DD] [--with-example] [--force]
-      Copy templates/report.html to OUT.html with the placeholders filled.
-      The example body is dropped unless --with-example is given. Refuses to
-      overwrite unless --force.
+               [--date YYYY-MM-DD] [--forge F] [--refs-base URL]
+               [--with-example] [--force]
+      Copy templates/report.html to OUT.html with the placeholders filled,
+      then bundle it. The forge references (#12, !34, ~56) link to the git
+      remote `origin` unless --refs-base names the project URL. The example
+      body is dropped unless --with-example is given. Refuses to overwrite
+      unless --force.
+
+  bundle FILE.html
+      Inline the vendored libraries the body needs into the VENDOR region:
+      Inter always, KaTeX when the body has math, Vega when it has charts.
+      Run it after writing the body; it is idempotent.
 
   lint FILE.html
       Check that FILE.html still follows the house style. Exit 1 on any
@@ -19,6 +27,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import html
 import json
@@ -37,15 +46,15 @@ BODY_EMPTY = "<!-- BODY:BEGIN -->\n<!-- the report body goes here: <p class=\"sf
 STYLE_RE = re.compile(r'<style id="sf-style">.*?</style>', re.S)
 RUNTIME_RE = re.compile(r'<script id="sf-runtime">.*?</script>', re.S)
 
-# Remote resources the template loads, and nothing else.
-REMOTE_OK = (
-    "https://fonts.googleapis.com",
-    "https://fonts.gstatic.com",
-    "https://cdn.jsdelivr.net/npm/katex@",
-    "https://cdn.jsdelivr.net/npm/vega@",
-    "https://cdn.jsdelivr.net/npm/vega-lite@",
-    "https://cdn.jsdelivr.net/npm/vega-embed@",
-)
+VENDOR = os.path.join(HERE, "..", "vendor")
+VENDOR_RE = re.compile(r"<!-- VENDOR:BEGIN -->.*?<!-- VENDOR:END -->", re.S)
+
+# A forge reference in prose: #12, !34, ~56, or group/project#12. Kept in step with linkRefs() in the runtime.
+REF_RE = re.compile(r"(?:^|(?<=[\s(\[{,;:]))((?:[\w.-]+(?:/[\w.-]+)+)?)([#!~])(\d+)(?![\w-])")
+REF_TEMPLATES = {
+    "gitlab": {"#": "{base}/{project}/-/issues/{id}", "!": "{base}/{project}/-/merge_requests/{id}", "~": "{base}/{project}/-/work_items/{id}"},
+    "github": {"#": "{base}/{project}/issues/{id}"},
+}
 TONES = {"accent", "positive", "caution", "negative"}
 STEP_STATES = {"done", "current", "next", "skip"}
 MARKS = {"line", "bar", "point", "area", "rule", "text", "tick"}
@@ -72,6 +81,114 @@ def default_project() -> str:
     return os.path.basename(top or os.getcwd())
 
 
+# ---------------------------------------------------------------- forge references
+
+def parse_remote(url: str) -> tuple[str, str] | None:
+    """Return (web base, project path) for a git remote URL, or None.
+
+    https://host[:port]/group/repo(.git) keeps the scheme and port; an SSH remote
+    (git@host:group/repo.git, ssh://git@host:2222/group/repo.git) maps to https://host.
+    """
+    url = url.strip()
+    m = re.match(r"^(https?)://(?:[^@/]+@)?([^/]+)/(.+?)(?:\.git)?/?$", url)
+    if m:
+        return f"{m.group(1)}://{m.group(2)}", m.group(3)
+    m = re.match(r"^(?:ssh://)?(?:[^@/]+@)?([^:/]+)(?::\d+/|:|/)(.+?)(?:\.git)?/?$", url)
+    if m:
+        return f"https://{m.group(1)}", m.group(2)
+    return None
+
+
+def refs_config(forge: str, refs_base: str | None) -> dict:
+    """The JSON for <meta name="sf-refs">: link templates per sigil, with the project filled in."""
+    if forge == "none":
+        return {}
+    parsed = parse_remote(refs_base) if refs_base else parse_remote(git("remote", "get-url", "origin"))
+    if not parsed:
+        return {}
+    base, project = parsed
+    if forge == "auto":
+        forge = "github" if base.endswith("://github.com") else "gitlab"
+    out: dict = {"project": project}
+    for sigil, tmpl in REF_TEMPLATES[forge].items():
+        out[sigil] = tmpl.replace("{base}", base)
+    return out
+
+
+# ---------------------------------------------------------------- bundle
+
+def vendor_read(rel: str, binary: bool = False):
+    with open(os.path.join(VENDOR, rel), "rb" if binary else "r", **({} if binary else {"encoding": "utf-8"})) as f:
+        return f.read()
+
+
+def data_uri(rel: str, mime: str) -> str:
+    return f"data:{mime};base64," + base64.b64encode(vendor_read(rel, binary=True)).decode("ascii")
+
+
+def inline_script(ident: str, *rels: str) -> str:
+    parts = []
+    for rel in rels:
+        src = vendor_read(rel)
+        if re.search(r"</script|<!--", src, re.I):
+            raise SystemExit(f"vendor/{rel} contains </script or <!--; it cannot be inlined as is")
+        parts.append(f"/* vendor/{rel} */\n{src.strip()}")
+    return f'<script id="{ident}">\n' + "\n".join(parts) + "\n</script>"
+
+
+def body_needs(text: str) -> tuple[bool, bool]:
+    """(math, charts): what the body uses, ignoring code samples and chart specs."""
+    m = BODY_RE.search(text)
+    body = m.group(1) if m else ""
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+    charts = 'class="sf-chart"' in body
+    prose = re.sub(r"<(pre|code|script)\b.*?</\1>", "", body, flags=re.S | re.I)
+    math = bool(re.search(r"\\[(\[]", prose))
+    return math, charts
+
+
+def vendor_block(text: str) -> str:
+    math, charts = body_needs(text)
+    fonts = "".join(
+        f"@font-face{{font-family:\"Inter\";font-style:{style};font-display:swap;font-weight:100 900;"
+        f"src:url({data_uri(f'inter/inter-latin-opsz-{style}.woff2', 'font/woff2')}) format(\"woff2\");"
+        "unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,"
+        "U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}\n"
+        for style in ("normal", "italic")
+    )
+    parts = ['<style id="sf-vendor-fonts">\n/* vendor/inter: Inter, SIL Open Font License 1.1 */\n' + fonts + "</style>"]
+    if math:
+        css = vendor_read("katex/katex.min.css")
+        # Keep only the woff2 source of each KaTeX font, as a data URI.
+        css = re.sub(r'src:url\((fonts/[^)]+\.woff2)\) format\("woff2"\)[^;}]*',
+                     lambda m: f'src:url({data_uri("katex/" + m.group(1), "font/woff2")}) format("woff2")', css)
+        if "url(fonts/" in css:
+            raise SystemExit("vendor/katex/katex.min.css still references fonts/ after inlining; re-run scripts/vendor.sh")
+        parts.append('<style id="sf-vendor-katex">\n/* vendor/katex: KaTeX, MIT License */\n' + css.strip() + "\n</style>")
+        parts.append(inline_script("sf-vendor-katex-js", "katex/katex.min.js", "katex/auto-render.min.js"))
+    if charts:
+        parts.append(inline_script("sf-vendor-vega", "vega/vega.min.js", "vega/vega-lite.min.js", "vega/vega-embed.min.js"))
+    return "<!-- VENDOR:BEGIN -->\n" + "\n".join(parts) + "\n<!-- VENDOR:END -->"
+
+
+def bundle(text: str) -> str:
+    if not VENDOR_RE.search(text):
+        raise SystemExit("no VENDOR:BEGIN / VENDOR:END region; re-scaffold the file with `report.py new`")
+    block = vendor_block(text)
+    return VENDOR_RE.sub(lambda _: block, text, count=1)
+
+
+def cmd_bundle(a: argparse.Namespace) -> int:
+    with open(a.file, encoding="utf-8") as f:
+        text = f.read()
+    out = bundle(text)
+    with open(a.file, "w", encoding="utf-8") as f:
+        f.write(out)
+    math, charts = body_needs(out)
+    print(f"{a.file}: Inter" + (", KaTeX" if math else "") + (", Vega" if charts else "") + f" ({len(out.encode()) // 1024} KB)")
+    return 0
+
+
 # ---------------------------------------------------------------- new
 
 def cmd_new(a: argparse.Namespace) -> int:
@@ -90,9 +207,11 @@ def cmd_new(a: argparse.Namespace) -> int:
         "AUTHOR": a.author or default_author(),
         "DATE": a.date or dt.date.today().isoformat(),
         "PATH": path if not path.startswith("..") else os.path.basename(a.out),
+        "REFS": json.dumps(refs_config(a.forge, a.refs_base), separators=(",", ":")),
     }
     for k, v in subs.items():
         text = text.replace("{{" + k + "}}", html.escape(v, quote=True))
+    text = bundle(text)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     with open(a.out, "w", encoding="utf-8") as f:
         f.write(text)
@@ -155,6 +274,8 @@ class Body(HTMLParser):
         self.in_footnotes = 0
         self.text: list[str] = []                        # prose text outside scripts and code, for [^n]
         self.skip_text = 0
+        self.ref_text: list[str] = []                    # prose a forge reference could link from
+        self.noref: list[str] = []                       # open tags that stop reference linking (a, data-noref)
 
     def line(self) -> int:
         return self.base + self.getpos()[0]
@@ -204,6 +325,8 @@ class Body(HTMLParser):
             self.in_footnotes += 1
         if self.in_footnotes and tag == "li":
             self.footnote_ids.append((a.get("id") or "", ln))
+        if tag == "a" or "data-noref" in a:
+            self.noref.append(tag)
         if tag not in self.VOID:
             self.stack.append((tag, cls))
 
@@ -229,6 +352,8 @@ class Body(HTMLParser):
             self.figure = None
         if tag == "section" and self.in_footnotes:
             self.in_footnotes -= 1
+        if self.noref and self.noref[-1] == tag:
+            self.noref.pop()
         # Pop to the matching open tag; tolerate unclosed <p>/<li>.
         for i in range(len(self.stack) - 1, -1, -1):
             if self.stack[i][0] == tag:
@@ -245,6 +370,8 @@ class Body(HTMLParser):
             self.caption.append(data)
         if not self.skip_text and not self.in_footnotes:
             self.text.append(data)
+        if not self.skip_text and not self.noref:
+            self.ref_text.append(data)
 
 
 # ---- chart specs
@@ -327,15 +454,17 @@ def lint_chart(spec_text: str, ln: int, caption: str, L: Lint) -> None:
 
 # ---- the whole file
 
-def lint_shell(text: str, L: Lint) -> None:
+def lint_shell(text: str, name: str, L: Lint) -> dict:
+    """Check everything outside the body; return the parsed forge reference config."""
+    refs: dict = {}
     tmpl = read_template()
-    for name, rx in (("style block (#sf-style)", STYLE_RE), ("runtime script (#sf-runtime)", RUNTIME_RE)):
+    for part, rx in (("style block (#sf-style)", STYLE_RE), ("runtime script (#sf-runtime)", RUNTIME_RE)):
         mine, theirs = rx.search(text), rx.search(tmpl)
         if not mine:
             hint = "; this file predates the current house style, so re-scaffold it with `report.py new` and move the body over" if "rp-section" in text or "Report." in text else ""
-            L.err(f"the {name} is missing{hint}")
+            L.err(f"the {part} is missing{hint}")
         elif theirs and mine.group(0) != theirs.group(0):
-            L.err(f"line {line_of(text, mine.start())}: the {name} differs from the template; a report never edits it (re-scaffold, or change the template in the skill)")
+            L.err(f"line {line_of(text, mine.start())}: the {part} differs from the template; a report never edits it (re-scaffold, or change the template in the skill)")
     for needle, what in (
         ('class="sf-topbar"', "top bar (header.sf-topbar)"),
         ('id="contents"', "outline (nav#contents)"),
@@ -351,12 +480,30 @@ def lint_shell(text: str, L: Lint) -> None:
         L.err(f"line {line_of(text, pm.start())}: unfilled placeholder {pm.group(0)}")
     if "<!-- EXAMPLE:BEGIN" in text:
         L.warn("example content is still present (EXAMPLE:BEGIN marker); replace it with the report's own body")
-    for rm in re.finditer(r'<(?:script|link)\b[^>]*?(?:src|href)="(https?://[^"]+)"', text):
-        if not rm.group(1).startswith(REMOTE_OK):
-            L.err(f"line {line_of(text, rm.start())}: remote resource {rm.group(1)} (the page loads only Inter, KaTeX, and Vega)")
+    for rm in re.finditer(r'<(?:script|link|img|iframe|source)\b[^>]*?(?:src|href)="((?:https?:)?//[^"]+)"', text):
+        L.err(f"line {line_of(text, rm.start())}: remote resource {rm.group(1)} (a report loads nothing from the network; inline it)")
+    vm = VENDOR_RE.search(text)
+    if not vm:
+        L.err("the VENDOR:BEGIN / VENDOR:END region is missing; re-scaffold with `report.py new` and move the body over")
+    elif vm.group(0) != vendor_block(text):
+        math, charts = body_needs(text)
+        need = "Inter" + (", KaTeX" if math else "") + (", Vega" if charts else "")
+        L.err(f"line {line_of(text, vm.start())}: the inlined libraries are out of date for this body (it needs {need}); run `report.py bundle {name}`")
+    rm = re.search(r'<meta name="sf-refs" content="([^"]*)"', text)
+    if not rm:
+        L.err('the forge reference config (<meta name="sf-refs">) is missing')
+    else:
+        try:
+            cfg = json.loads(html.unescape(rm.group(1)))
+            if not isinstance(cfg, dict):
+                raise ValueError
+            refs = cfg
+        except ValueError:
+            L.err(f"line {line_of(text, rm.start())}: <meta name=\"sf-refs\"> is not a JSON object")
+    return refs
 
 
-def lint_body(text: str, L: Lint) -> None:
+def lint_body(text: str, refs: dict, L: Lint) -> None:
     m = BODY_RE.search(text)
     if not m:
         L.err("the BODY:BEGIN / BODY:END markers are missing; the lint cannot find the report body")
@@ -448,6 +595,12 @@ def lint_body(text: str, L: Lint) -> None:
             L.warn(f"line {c['line']}: chart outside a figure.sf-figure (it needs a numbered caption)")
             lint_chart(c["text"], c["line"], "", L)
 
+    # forge references
+    unlinked = sorted({m.group(2) for m in REF_RE.finditer("".join(b.ref_text))} - set(k for k, v in refs.items() if isinstance(v, str) and k in "#!~"))
+    if unlinked:
+        L.warn(f"references with {', '.join(unlinked)} will not link: <meta name=\"sf-refs\"> has no template for them "
+               "(re-scaffold with --refs-base, or edit the meta; wrap a non-reference in data-noref)")
+
     # footnotes
     refs = {int(n) for n in FOOTNOTE_REF_RE.findall("".join(b.text))}
     items = b.footnote_ids
@@ -466,8 +619,8 @@ def cmd_lint(a: argparse.Namespace) -> int:
     with open(a.file, encoding="utf-8") as f:
         text = f.read()
     L = Lint()
-    lint_shell(text, L)
-    lint_body(text, L)
+    refs = lint_shell(text, a.file, L)
+    lint_body(text, refs, L)
     for w in L.warnings:
         print(f"warning: {w}")
     for e in L.errors:
@@ -500,11 +653,18 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--title", required=True)
     n.add_argument("--kicker", default="Report", help="the word above the title and in the brand (default: Report)")
     n.add_argument("--project", help="the name in the top bar (default: the git repo's directory name)")
+    n.add_argument("--forge", choices=["auto", "gitlab", "github", "none"], default="auto",
+                   help="link style for #12 / !34 / ~56 (default: github for github.com, else gitlab)")
+    n.add_argument("--refs-base", help="the project's web URL, e.g. https://gitlab.example.com/group/repo (default: the origin remote)")
     n.add_argument("--author")
     n.add_argument("--date")
     n.add_argument("--with-example", action="store_true")
     n.add_argument("--force", action="store_true")
     n.set_defaults(fn=cmd_new)
+
+    b = sub.add_parser("bundle", help="inline the vendored libraries the body needs")
+    b.add_argument("file")
+    b.set_defaults(fn=cmd_bundle)
 
     l = sub.add_parser("lint", help="check a report against the house style")
     l.add_argument("file")

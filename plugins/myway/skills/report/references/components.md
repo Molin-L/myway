@@ -185,6 +185,25 @@ A question to answer, a claim with its test, or a choice for the reader. Each ha
 
 Questions are `<ol class="sf-questions">` of `<li class="sf-question" id="q1">` with the same `sf-head` and an optional badge at the end of the head. In a decision, mark at most one option `data-recommended` (the lint fails on two). For a decision already taken, mark the chosen option `data-chosen` and end it with `<span class="sf-badge" data-tone="accent">Chosen</span>`.
 
+## Forge references
+
+Write issues, merge requests, pull requests, and work items in plain text; the page turns each one into a link that opens in a new tab:
+
+| Text | GitLab | GitHub |
+|---|---|---|
+| `#12` | issue 12 | issue or pull request 12 |
+| `!34` | merge request 34 | not linked |
+| `~56` | work item 56 | not linked |
+| `group/project#12` (also `!` and `~`) | the same, in another project on the same host | issue 12 in that repository |
+
+```html
+<p>The retry budget is in review as !497, tracked in #1311 and ~88; the alert is platform/infra#204.</p>
+```
+
+- A reference starts the text or follows a space or `( [ { , ; :`, and ends at a non-word character: `x#12`, `C#1`, `#12abc`, and URL fragments stay text.
+- References inside `<a>`, `<code>`, `<pre>`, math, or an element with `data-noref` stay text. Use `data-noref` for a `#1` that is a rank, not an issue: `Ranked <span data-noref>#1</span>`.
+- The links come from `<meta name="sf-refs">`, which `report.py new` fills from the git remote (or `--refs-base`). The lint warns when the body has a reference the config cannot link.
+
 ## Footnotes
 
 Cite with `[^n]` in the text; the page turns each marker into a link. End the body with:
