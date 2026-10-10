@@ -112,6 +112,38 @@ Per Criterion, the verdict `met`, `partial`, or `none` with its citation. A
 `none` or an uncovered `partial` becomes a Gap issue in the project the work
 belongs to, linked to the milestone.
 
+### Benchmarks
+
+**Scenario**:
+An explicit, versioned workload spec (`bench/scenarios/<id>.json`). Changing
+what it measures means bumping its `version`. Trials are comparable only when
+their scenario sha is equal.
+_Avoid_: test case, workload (as the canonical term)
+
+**Variant**:
+One design or implementation under comparison, pinned to one commit and
+tagged with its factors. New code is a new variant id.
+_Avoid_: candidate, config
+
+**Factor**:
+A design decision a Variant embodies (`storage: lsm`), used to explain which
+decisions mattered. Not a tunable parameter.
+
+**Session**:
+One sitting on one machine: one environment, one baseline, one plan.
+
+**Trial**:
+One Variant on one Scenario version within a Session. Holds its reps as raw
+lines, append-only, and carries the scenario version and sha as attributes.
+_Avoid_: run (ambiguous between Session and Trial)
+
+**Rep**:
+One repetition inside a Trial.
+
+**Evaluation profile**:
+What "best" means: gates, objectives with direction and weight, normalisation.
+Applied at read time, versioned, never stored in results.
+
 ### Outcomes
 
 **Verification**:

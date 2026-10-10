@@ -93,6 +93,22 @@ machine-prose tells. The reasons: [ADR 0002](docs/adr/0002-report-tokens-come-fr
 [ADR 0004](docs/adr/0004-reports-load-nothing-from-the-network.md), and
 [ADR 0005](docs/adr/0005-report-claims-stand-on-facts.md).
 
+## Benchmarks
+
+`bench` compares designs or implementations, not parameter values, on several
+factors, against workloads defined well enough that the answer still holds
+after the benchmark grows. Four records stay separate: **scenarios** (explicit
+JSON specs, versioned, every input pinned by sha256), **variants** (one commit
+each, tagged with the design factors they embody), **trials** (raw reps,
+append-only, under `results/<scenario>/`), and **evaluation profiles** (gates,
+objectives, weights). The scenario version is an attribute of every trial,
+never a path segment; comparable means equal spec sha.
+`scripts/bench.py run` checks out each variant, runs warmups, interleaves
+reps, and re-runs the baseline every session; `check` refuses a spec edited
+without a version bump or a variant re-pointed at new code; `evaluate` applies
+gates, then the Pareto front, then the weighted score, then factor effects.
+The reasons: [ADR 0006](docs/adr/0006-benchmark-scenario-version-is-a-trial-attribute.md).
+
 ## Install
 
 **Claude Code**
@@ -132,6 +148,7 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 | [`plugins/myway/skills/cog/SKILL.md`](plugins/myway/skills/cog/SKILL.md) | `/cog init` · `/cog update` — cognition docs: your model of a system, kept as `docs/cognition/` |
 | [`plugins/myway/skills/weekly-goal/SKILL.md`](plugins/myway/skills/weekly-goal/SKILL.md) | Weekly goals as GitLab group milestones, and the gap check |
 | [`plugins/myway/skills/report/SKILL.md`](plugins/myway/skills/report/SKILL.md) | House-style HTML reports: one template, light/dark toggle, D3 charts on a fixed palette |
+| [`plugins/myway/skills/bench/SKILL.md`](plugins/myway/skills/bench/SKILL.md) | Design benchmarks: versioned scenarios, pinned variants, raw trials, gates → Pareto → score |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
 
