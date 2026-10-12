@@ -81,7 +81,7 @@ The order is fixed: gates disqualify; the Pareto front shows the real trade-offs
 
 ### 6. Report
 
-Tell the user, in this order: the profile and suite (with the scenario versions), the excluded variants and why, the Pareto front, the ranking with its scores, the factor effects, and anything provisional, single-session, or within noise. For a shareable page, hand the `--json` output to the `report` skill (kicker `Benchmark`); its Method section takes the session manifests (host, env probes, commits) and the scenario shas.
+Tell the user, in this order: the profile and suite (with the scenario versions), the excluded variants and why, the Pareto front, the ranking with its scores, the factor effects, and anything provisional, single-session, or within noise. For a shareable page, hand the `--json` output to the `formal-report` skill (kicker `Benchmark`); its Method section takes the session manifests (host, env probes, commits) and the scenario shas.
 
 ## Rules
 

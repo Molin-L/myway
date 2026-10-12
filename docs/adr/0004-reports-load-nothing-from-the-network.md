@@ -1,5 +1,9 @@
 # Reports load nothing from the network
 
+> Applies to `formal-report` since [ADR 0007](0007-formal-reports-are-a-separate-skill.md);
+> the vendor directory is now `plugins/myway/skills/formal-report/vendor/`.
+> The `report` skill still loads D3 from its CDN.
+
 Reports are read inside private networks where public CDNs are unreachable,
 and often blackholed rather than refused. A blackholed CDN is worse than a
 missing one: the Google Fonts stylesheet blocks rendering and deferred KaTeX
@@ -8,7 +12,7 @@ TCP timeout before they appear, and the charts then fail outright.
 
 We decided that **a report is self-contained down to its libraries.** Vega,
 Vega-Lite, vega-embed, KaTeX with its woff2 fonts, and the Inter font are
-vendored in `plugins/myway/skills/report/vendor/` at pinned versions
+vendored in `plugins/myway/skills/formal-report/vendor/` at pinned versions
 (`scripts/vendor.sh` fetches them), and `report.py bundle` inlines into each
 report what its body uses: Inter always, KaTeX when there is math, Vega when
 there are charts.

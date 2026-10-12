@@ -1,5 +1,9 @@
 # Reports share the research reading style
 
+> Amended by [ADR 0007](0007-formal-reports-are-a-separate-skill.md): the
+> reading style moved to the `formal-report` skill, and `report` went back to
+> its own house style. Read `report` below as `formal-report`.
+
 The research workspace (`~/Research/theory`) grew its own reading page for
 phase documents: Inter text, a serif title and numerals, a centred column,
 an "On this page" outline with a sliding pill, a fixed component vocabulary

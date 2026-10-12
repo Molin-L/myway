@@ -1,5 +1,7 @@
 # Report claims stand on facts, in plain prose
 
+> Applies to `formal-report` since [ADR 0007](0007-formal-reports-are-a-separate-skill.md).
+
 A report is read once by someone who will act on it. Generated reports had two
 failure modes the style checks could not see: numbers in the lede and the stat
 row that nothing lower in the page backed, and prose with the tells of machine

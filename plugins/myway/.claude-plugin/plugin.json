@@ -1,6 +1,6 @@
 {
   "name": "myway",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Development workflows, my way. Governs the scaffolding around a change: issue as spec of record, feature branch off the latest pre-release train, conventional commits, change request, and a bounded CI escort to green.",
   "author": {
     "name": "Molin. L"
@@ -20,7 +20,9 @@
     "report",
     "html",
     "d3",
-    "benchmark"
+    "benchmark",
+    "vega-lite",
+    "katex"
   ],
   "skills": [
     "./skills/implement-change",
@@ -28,6 +30,7 @@
     "./skills/cog",
     "./skills/weekly-goal",
     "./skills/report",
+    "./skills/formal-report",
     "./skills/bench"
   ]
 }

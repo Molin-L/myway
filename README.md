@@ -75,23 +75,36 @@ transport); writes go through `glab api`. One-time setup: the goal group, see
 
 ## Reports
 
-`report` turns results into one self-contained HTML file in the house reading
-style shared with the research workspace: a serif title in a centred column,
-roman-numbered sections, an "On this page" outline on the right built from the
-`h2`/`h3` headings (a drawer on narrow screens), a fixed component vocabulary
-(lede, stats, callouts, timeline, cards, decisions, footnotes), KaTeX math,
-Vega-Lite charts themed from the tokens, and `#12` / `!34` / `~56` references
-linked to the forge. Inter, KaTeX, and Vega are vendored and inlined into the
-file, so a report opens offline and in a private network. The author writes the
-body and the data; `scripts/report.py new` scaffolds the file, `bundle` inlines the libraries the
-body needs, and `lint` refuses an edited style or runtime, any remote resource, colours or remote data in chart specs,
-axes without units, unnumbered figures, duplicate ids, and unfilled
-placeholders. Every claim stands on a fact with a checkable source, and the
-prose is plain: `lint` also warns on a stat no section backs and on
-machine-prose tells. The reasons: [ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md)
+Two skills turn results into one self-contained HTML file. They share the
+figure rules (titled axes with units, numbered captions, labelled reference
+lines, `null` for missing data) and differ in style and in how much they ask
+of the author.
+
+`report` is the everyday page, in the house style: system sans, a floating
+outline on the left built from the `h2`–`h4` headings (a drawer on narrow
+screens), a light/dark toggle in the top bar, stat tiles, callouts, tables,
+and D3 charts drawn through a fixed token palette. `scripts/report.py new`
+scaffolds the file and `lint` checks the theme bootstrap, the outline, ids,
+heading levels, figure captions and axis units, colour literals, and remote
+resources other than the D3 CDN. The reasons:
+[ADR 0002](docs/adr/0002-report-tokens-come-from-the-validated-palette.md)
+and [ADR 0007](docs/adr/0007-formal-reports-are-a-separate-skill.md).
+
+`formal-report` is the page to share outside the team or keep as a record, in
+the research reading style (adapted from numbers.sfinterface.com): a serif
+title in a centred column, roman-numbered sections, an "On this page" outline
+on the right, a fixed component vocabulary (lede, stats, callouts, timeline,
+cards, decisions, footnotes), KaTeX math, Vega-Lite charts themed from the
+tokens, and `#12` / `!34` / `~56` references linked to the forge. Inter, KaTeX,
+and Vega are vendored and inlined, so it opens offline and in a private
+network. Every claim stands on a fact with a checkable source, the prose is
+plain, and the body ends with a Method section; `lint` refuses an edited style
+or runtime, any remote resource, and colours in chart specs, and warns on a
+stat no section backs and on machine-prose tells. The reasons:
 [ADR 0003](docs/adr/0003-reports-share-the-research-reading-style.md),
-[ADR 0004](docs/adr/0004-reports-load-nothing-from-the-network.md), and
-[ADR 0005](docs/adr/0005-report-claims-stand-on-facts.md).
+[ADR 0004](docs/adr/0004-reports-load-nothing-from-the-network.md),
+[ADR 0005](docs/adr/0005-report-claims-stand-on-facts.md), and
+[ADR 0007](docs/adr/0007-formal-reports-are-a-separate-skill.md).
 
 ## Benchmarks
 
@@ -148,6 +161,7 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 | [`plugins/myway/skills/cog/SKILL.md`](plugins/myway/skills/cog/SKILL.md) | `/cog init` · `/cog update` — cognition docs: your model of a system, kept as `docs/cognition/` |
 | [`plugins/myway/skills/weekly-goal/SKILL.md`](plugins/myway/skills/weekly-goal/SKILL.md) | Weekly goals as GitLab group milestones, and the gap check |
 | [`plugins/myway/skills/report/SKILL.md`](plugins/myway/skills/report/SKILL.md) | House-style HTML reports: one template, light/dark toggle, D3 charts on a fixed palette |
+| [`plugins/myway/skills/formal-report/SKILL.md`](plugins/myway/skills/formal-report/SKILL.md) | Formal HTML reports in the research reading style: claims on sourced facts, KaTeX, Vega-Lite, everything inlined |
 | [`plugins/myway/skills/bench/SKILL.md`](plugins/myway/skills/bench/SKILL.md) | Design benchmarks: versioned scenarios, pinned variants, raw trials, gates → Pareto → score |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
