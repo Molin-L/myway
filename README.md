@@ -122,6 +122,24 @@ without a version bump or a variant re-pointed at new code; `evaluate` applies
 gates, then the Pareto front, then the weighted score, then factor effects.
 The reasons: [ADR 0006](docs/adr/0006-benchmark-scenario-version-is-a-trial-attribute.md).
 
+## Readiness audits
+
+`repo-readiness-audit` checks one commit of a repo against its PRD and goal. It
+answers two questions: can this commit go to staging, and where does the real
+system differ from the team's model? It suits an AI-built repo, because it does
+not accept the builder's statements as evidence.
+
+Separate agents do the work with limited views: a ledger extractor, an
+acceptance test author, forward and reverse tracers, a test integrity auditor,
+a readiness auditor, and a cognition reviewer. `scripts/audit.py` records each
+test run and derives verification, evidence level (E0 to E4), goal status, and
+the verdict for each stage, so that no agent can claim them. A human approves
+the ledger and decides each agent choice that the PRD did not specify. The
+report is `REPORT.md`: the verdict, a requirement matrix, a gap register, a
+reverse trace, a test integrity audit, production readiness, and a Believes /
+Decided / Unknown delta. The reasons:
+[ADR 0008](docs/adr/0008-audit-status-comes-from-the-script.md).
+
 ## Install
 
 **Claude Code**
@@ -163,6 +181,7 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 | [`plugins/myway/skills/report/SKILL.md`](plugins/myway/skills/report/SKILL.md) | House-style HTML reports: one template, light/dark toggle, D3 charts on a fixed palette |
 | [`plugins/myway/skills/formal-report/SKILL.md`](plugins/myway/skills/formal-report/SKILL.md) | Formal HTML reports in the research reading style: claims on sourced facts, KaTeX, Vega-Lite, everything inlined |
 | [`plugins/myway/skills/bench/SKILL.md`](plugins/myway/skills/bench/SKILL.md) | Design benchmarks: versioned scenarios, pinned variants, raw trials, gates → Pareto → score |
+| [`plugins/myway/skills/repo-readiness-audit/SKILL.md`](plugins/myway/skills/repo-readiness-audit/SKILL.md) | Readiness audits: one commit against its PRD, with evidence levels, stage verdicts, a gap register, and a cognition delta |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
 
