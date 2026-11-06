@@ -1,6 +1,6 @@
 {
   "name": "myway",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Development workflows, my way. Governs the scaffolding around a change: issue as spec of record, feature branch off the latest pre-release train, conventional commits, change request, and a bounded CI escort to green.",
   "author": {
     "name": "Molin. L"
@@ -24,7 +24,9 @@
     "vega-lite",
     "katex",
     "audit",
-    "prd"
+    "prd",
+    "testing",
+    "mutation-testing"
   ],
   "skills": [
     "./skills/implement-change",
@@ -34,6 +36,7 @@
     "./skills/report",
     "./skills/formal-report",
     "./skills/bench",
-    "./skills/repo-readiness-audit"
+    "./skills/repo-readiness-audit",
+    "./skills/test-audit"
   ]
 }

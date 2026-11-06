@@ -140,6 +140,28 @@ reverse trace, a test integrity audit, production readiness, and a Believes /
 Decided / Unknown delta. The reasons:
 [ADR 0008](docs/adr/0008-audit-status-comes-from-the-script.md).
 
+## Test audits
+
+`test-audit` controls test bloat in an agent-built codebase. It controls two
+points. A new test must name the wrong behavior that it rejects. A deleted test
+must have evidence that no protection goes with it.
+
+`scripts/test_audit.py` runs each test alone and records its production lines.
+`prove` applies a wrong-behavior patch in a temporary worktree: the test must
+pass before the patch and fail after it, for the expected reason. `check`
+simulates the whole deletion batch. `gate` compares the before and after
+snapshots of a test-only commit. It fails on an undeclared loss of coverage, a
+removed test with no evidence, an added test with no proof, or a new surviving
+mutant. Separate agents discover and judge the candidates, and a human approves
+each change to a contract test. It has configs for C++, Go, Rust, and Python.
+The reasons: [ADR 0009](docs/adr/0009-test-deletion-needs-evidence.md).
+
+To apply the authoring gate in a target repo, add one line to its `CLAUDE.md` /
+`AGENTS.md`:
+
+> Writing, reviewing, or removing tests always goes through the
+> `myway:test-audit` skill.
+
 ## Install
 
 **Claude Code**
@@ -182,6 +204,7 @@ See [config reference](plugins/myway/skills/implement-change/references/config.m
 | [`plugins/myway/skills/formal-report/SKILL.md`](plugins/myway/skills/formal-report/SKILL.md) | Formal HTML reports in the research reading style: claims on sourced facts, KaTeX, Vega-Lite, everything inlined |
 | [`plugins/myway/skills/bench/SKILL.md`](plugins/myway/skills/bench/SKILL.md) | Design benchmarks: versioned scenarios, pinned variants, raw trials, gates → Pareto → score |
 | [`plugins/myway/skills/repo-readiness-audit/SKILL.md`](plugins/myway/skills/repo-readiness-audit/SKILL.md) | Readiness audits: one commit against its PRD, with evidence levels, stage verdicts, a gap register, and a cognition delta |
+| [`plugins/myway/skills/test-audit/SKILL.md`](plugins/myway/skills/test-audit/SKILL.md) | Test audits: an authoring gate for new tests, and evidence-gated removal of low-value tests |
 | [`CONTEXT.md`](CONTEXT.md) | Glossary |
 | [`docs/adr/`](docs/adr/) | Decision records |
 
