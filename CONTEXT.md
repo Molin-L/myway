@@ -144,6 +144,25 @@ One repetition inside a Trial.
 What "best" means: gates, objectives with direction and weight, normalisation.
 Applied at read time, versioned, never stored in results.
 
+### Test audits
+
+**Wrong behavior**:
+A plausible incorrect implementation of a requirement, written as a patch to
+production code. A test earns its place by rejecting one.
+_Avoid_: bug, failure case
+
+**Proof**:
+A recorded `prove` run: the test passes before the Wrong behavior patch and
+fails after it, for the expected reason.
+
+**Candidate**:
+A test proposed for deletion, merge, or rewrite, with its evidence. Its status
+comes from the script.
+
+**Unlock**:
+Production lines that lose all coverage when a Candidate goes. They are declared
+in the Candidate and deleted in a later commit.
+
 ### Outcomes
 
 **Verification**:
